@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>选题雷达 - 激活</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #0f1117;
+  color: #e4e6f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  user-select: none;
+}
+
+.card {
+  width: 420px;
+  padding: 40px;
+  background: #1a1d28;
+  border: 1px solid #2a2d3e;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.logo {
+  font-size: 2.4rem;
+  margin-bottom: 4px;
+}
+.title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.version {
+  font-size: 0.72rem;
+  color: #5c6080;
+  margin-bottom: 24px;
+}
+
+.section {
+  margin-bottom: 20px;
+  text-align: left;
+}
+.section-label {
+  font-size: 0.76rem;
+  color: #9ca0b8;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.machine-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.machine-code-box {
+  flex: 1;
+  padding: 10px 14px;
+  background: #0f1117;
+  border: 1px solid #2a2d3e;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  color: #f59e0b;
+  text-align: center;
+  word-break: break-all;
+}
+.btn-copy {
+  padding: 10px 16px;
+  border: 1px solid #3d4058;
+  border-radius: 8px;
+  background: #222533;
+  color: #9ca0b8;
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: nowrap;
+}
+.btn-copy:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.input-code {
+  width: 100%;
+  padding: 12px 14px;
+  background: #0f1117;
+  border: 1px solid #2a2d3e;
+  border-radius: 8px;
+  color: #e4e6f0;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-code:focus {
+  border-color: #f59e0b;
+}
+.input-code::placeholder {
+  color: #3d4058;
+  letter-spacing: 0;
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
+.btn-activate {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: #f59e0b;
+  color: #0f1117;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+  margin-top: 8px;
+}
+.btn-activate:hover {
+  filter: brightness(1.1);
+}
+.btn-activate:active {
+  transform: scale(0.98);
+}
+
+.error-msg {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: #ef4444;
+  min-height: 20px;
+}
+
+.footer-text {
+  margin-top: 24px;
+  font-size: 0.7rem;
+  color: #5c6080;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">🚗</div>
+  <div class="title">选题雷达</div>
+  <div class="version">版本 2.3 · 离线激活</div>
+
+  <div class="section">
+    <div class="section-label">本机机器码</div>
+    <div class="machine-code-row">
+      <div class="machine-code-box" id="machineCode">加载中…</div>
+      <button class="btn-copy" onclick="copyMachineCode()">复制</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">激活码</div>
+    <input
+      type="text"
+      class="input-code"
+      id="activationInput"
+      placeholder="请输入激活码，格式 XXXX-XXXX"
+      maxlength="35"
+      autocomplete="off"
+    >
+  </div>
+
+  <button class="btn-activate" id="btnActivate" onclick="submitActivation()">激 活</button>
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="footer-text">
+    请将机器码发给客服获取激活码<br>
+    每台电脑绑定一个唯一激活码，换电脑需重新激活
+  </div>
+</div>
+
+<script>
+const btnActivate = document.getElementById('btnActivate');
+const errorEl = document.getElementById('errorMsg');
+const machineCodeEl = document.getElementById('machineCode');
+const inputEl = document.getElementById('activationInput');
+
+// 加载机器码
+(async () => {
+  try {
+    const code = await window.electronAPI.getMachineCode();
+    machineCodeEl.textContent = code;
+  } catch (e) {
+    machineCodeEl.textContent = '获取失败';
+    console.error(e);
+  }
+})();
+
+function copyMachineCode() {
+  const code = machineCodeEl.textContent;
+  if (!code || code === '加载中…' || code === '获取失败') return;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '已复制';
+    btn.style.borderColor = '#22c55e';
+    btn.style.color = '#22c55e';
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 1500);
+  }).catch(() => {});
+}
+
+async function submitActivation() {
+  const code = inputEl.value.trim();
+  if (!code) {
+    errorEl.textContent = '请输入激活码';
+    return;
+  }
+  if (!code.includes('-')) {
+    errorEl.textContent = '激活码格式错误，应包含一个 "-" 分隔符';
+    return;
+  }
+
+  btnActivate.disabled = true;
+  btnActivate.textContent = '验证中…';
+  errorEl.textContent = '';
+
+  try {
+    const result = await window.electronAPI.submitActivation(code);
+    if (result.success) {
+      errorEl.style.color = '#22c55e';
+      errorEl.textContent = '激活成功！正在进入…';
+      // 窗口将在主进程中被关闭并打开主窗口
+    } else {
+      errorEl.style.color = '#ef4444';
+      errorEl.textContent = result.error || '激活码无效';
+      btnActivate.disabled = false;
+      btnActivate.textContent = '激 活';
+    }
+  } catch (e) {
+    errorEl.style.color = '#ef4444';
+    errorEl.textContent = '验证失败：' + e.message;
+    btnActivate.disabled = false;
+    btnActivate.textContent = '激 活';
+  }
+}
+
+// 回车提交
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitActivation();
+});
+</script>
+</body>
+</html>

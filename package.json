@@ -1,0 +1,62 @@
+{
+  "name": "usedcar-topic-radar",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "description": "林岛AI - 自媒体全套工作流",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "fetch": "node scripts/fetch-usedcar-radar.mjs",
+    "refresh": "node scripts/fetch-usedcar-radar.mjs --write",
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder"
+  },
+  "dependencies": {
+    "@vercel/analytics": "latest",
+    "cheerio": "latest",
+    "isexe": "^4.0.0",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "rss-parser": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "typescript": "latest"
+  },
+  "build": {
+    "appId": "com.lindao.ai",
+    "productName": "林岛AI",
+    "copyright": "Copyright 2026",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "topic-tool.html",
+      "inspirations/**/*",
+      "music/**/*",
+      "!keygen.html"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "林岛AI"
+    }
+  }
+}

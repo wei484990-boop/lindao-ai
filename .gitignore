@@ -1,0 +1,7 @@
+﻿node_modules/
+dist-electron/
+*.exe
+*.blockmap
+*.asar
+package-lock.json
+keygen.html
