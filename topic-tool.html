@@ -312,6 +312,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   .sidebar.collapsed .sidebar-nav { display:none; }
   .sidebar.collapsed .sidebar-inline-player { display:none; }
   .sidebar.collapsed .sidebar-progress-bar { display:none; }
+  .sidebar.collapsed .sidebar-brand .accent { display:none; }
+  .sidebar.collapsed .sidebar-brand { padding:4px 6px; }
+  .sidebar.collapsed { width:auto; min-width:44px; }
   .main-content { width:100%; padding:12px 10px 48px; }
   .topic-bar .topic-title { font-size:.76rem; }
   .weight-row { flex-wrap:wrap; }
@@ -6357,6 +6360,11 @@ async function updateDataUsage() {
 async function init() {
   try {
   await migrateToIndexedDB();
+  // 优先渲染核心 UI（不依赖 Supabase），确保元素卡片和类别立即可见
+  renderElements();
+  renderCategories();
+  renderSelectionSummary();
+  // Supabase 初始化（失败不影响已渲染的 UI）
   await supaInit();
   // 从 Supabase 云端拉取最新数据，回填到本地
   try { await supaPullAllData(); } catch(e) { console.warn('Supabase 数据拉取失败，使用本地缓存:', e); }
@@ -6366,6 +6374,7 @@ async function init() {
   document.title = appName;
   loadApiConfig();
   getCustomCategories();
+  // Supabase 数据拉取后刷新 UI（可能会更新权重/偏好）
   renderElements();
   renderCategories();
   renderSelectionSummary();
