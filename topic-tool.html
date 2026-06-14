@@ -373,33 +373,87 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   .sidebar-btn:hover { background: var(--bg); }
 
   .main-content { width: 100%; padding: 12px 10px 48px; }
-  .topic-bar .topic-title { font-size: .88rem; line-height: 1.3; }
   .weight-row { flex-wrap: wrap; }
   .review-textarea { min-height: 140px; }
 
   /* --- 选题结果手机端紧凑适配 --- */
-  .topic-grid { gap: 8px; }
-  .topic-card { border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
-  .topic-bar { padding: 8px 10px; gap: 6px; }
-  .topic-bar .topic-tags { gap: 2px; }
-  .topic-bar .topic-score { width: 30px; height: 30px; font-size: .66rem; }
+  .topic-grid { gap: 8px; padding-bottom: 70px; /* 底部安全距离防浏览器工具栏遮挡 */ }
+  .topic-card { border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.12); min-height:unset; height:auto; }
+
+  /* 手机端卡片垂直布局：标题+标签+评分改为上下结构，确保文字横排 */
+  .topic-bar {
+    position: relative;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 28px 8px 10px; /* 右侧留出评分圆的空间 */
+    flex-wrap: nowrap;
+  }
+  .topic-bar .expand-icon {
+    display: none; /* 手机端隐藏展开图标，直接显示内容 */
+  }
+  .topic-bar .topic-title {
+    width: 100%;
+    flex: none;
+    min-width: 0;
+    word-break: normal !important;       /* 关键！中文正常换行，逐字断行根因 */
+    overflow-wrap: normal !important;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+  .topic-bar .topic-tags {
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    flex-shrink: 1;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .topic-bar .topic-tags::-webkit-scrollbar {
+    display: none;
+  }
+  .topic-bar .topic-score {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    width: 28px;
+    height: 28px;
+    font-size: .64rem;
+    flex-shrink: 0;
+  }
   .topic-body { padding: 0 10px 10px; }
   .topic-hook { font-size: .72rem; margin: 8px 0 6px; padding: 6px 10px; line-height: 1.35; }
   .topic-detail { font-size: .66rem; gap: 5px; margin-bottom: 8px; }
   .topic-actions { gap: 3px; }
   .topic-actions button { padding: 4px 8px; font-size: .66rem; border-radius: 5px; }
+  /* 卡片操作按钮精简：隐藏非核心按钮 */
+  .topic-actions .block-btn { display:none; }
+  .topic-actions .delete-btn { display:none; }
+  .topic-actions .btn-gen-script { display:none; }
   .topic-card img { max-width: 100%; height: auto; }
-  .tag { padding: 1px 6px; font-size: .62rem; }
-  .tag-cat, .tag-act, .tag-custom, .tag-dynamic, .tag-api, .tag-audience { padding: 1px 6px; font-size: .62rem; }
-  .tag-elem { padding: 1px 5px; font-size: .6rem; }
-  .result-bar { padding: 10px 12px; margin-bottom: 10px; border-radius: 8px; }
-  .result-bar .result-info { font-size: .72rem; }
-  .result-actions { gap: 4px; margin: 10px 0; }
-  .result-actions button { padding: 5px 10px; font-size: .7rem; border-radius: 6px; }
+  .tag { padding: 1px 5px; font-size: .6rem; }
+  .tag-cat, .tag-act, .tag-custom, .tag-dynamic, .tag-api, .tag-audience { padding: 1px 5px; font-size: .6rem; }
+  .tag-elem { padding: 1px 4px; font-size: .58rem; }
+  .result-bar { padding: 8px 10px; margin-bottom: 8px; border-radius: 8px; }
+  .result-bar .result-info { font-size: .7rem; }
+  /* 顶部操作栏精简：隐藏全局功能按钮 */
+  .result-actions { gap: 4px; margin: 8px 0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+  .result-actions::-webkit-scrollbar { display:none; }
+  .result-actions .wj-inspire-trigger { display:none; }
+  #btnTrainMode { display:none; }
+  #regenBtn + button { display:none; } /* 导出全部 */
+  .result-actions .btn-clear { display:none; }
+  .result-actions button { padding: 5px 10px; font-size: .7rem; border-radius: 6px; white-space:nowrap; flex-shrink:0; }
   .panel { padding: 12px; margin-bottom: 10px; border-radius: 8px; }
   .gen-btns { gap: 6px; }
   .btn-generate { padding: 12px 16px; font-size: .88rem; }
   .btn-random { padding: 12px 16px; font-size: .78rem; }
+  /* 底部安全区：防止手机浏览器工具栏遮挡 */
+  .main-content { padding-bottom: 80px; }
+  /* 编辑按钮在卡片操作区也隐藏（保留复制/收藏/点赞核心操作） */
+  .topic-actions > button:nth-child(7) { display:none; }
 }
 @media (min-width:701px) {
   .sidebar-toggle { display: none; }
