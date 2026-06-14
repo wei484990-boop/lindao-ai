@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>林岛AI</title>
@@ -6364,8 +6364,8 @@ async function init() {
   renderElements();
   renderCategories();
   renderSelectionSummary();
-  // Supabase 初始化（失败不影响已渲染的 UI）
-  await supaInit();
+  // Supabase 初始化（失败不影响已渲染的 UI），3 秒超时避免 CDN 阻塞
+  await Promise.race([supaInit(), new Promise(r => setTimeout(r, 3000))]);
   // 从 Supabase 云端拉取最新数据，回填到本地
   try { await supaPullAllData(); } catch(e) { console.warn('Supabase 数据拉取失败，使用本地缓存:', e); }
   const theme = loadTheme(); setTheme(theme);
