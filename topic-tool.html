@@ -296,32 +296,89 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 .blocklist-item { display:inline-block; padding:3px 10px; background:color-mix(in srgb, var(--danger) 6%, var(--bg)); border:1px solid color-mix(in srgb, var(--danger) 20%, var(--border)); border-radius:10px; margin:2px; font-size:.7rem; color:var(--danger); }
 .blocklist-item button { background:none; border:none; color:var(--danger); cursor:pointer; margin-left:4px; font-size:.76rem; font-weight:700; }
 
+/* ===== Mobile Top Bar (抽屉式导航条) ===== */
+.mobile-topbar {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 48px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  z-index: 150;
+  align-items: center;
+  padding: 0 8px;
+}
+.mobile-topbar .hamburger {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent;
+  color: var(--text-secondary); font-size: 1.4rem;
+  cursor: pointer; border-radius: 8px;
+  flex-shrink: 0;
+}
+.mobile-topbar .hamburger:hover { color: var(--accent); background: var(--bg); }
+.mobile-topbar .topbar-title {
+  flex: 1; text-align: center;
+  font-size: .9rem; font-weight: 700;
+  color: var(--text);
+  letter-spacing: .3px;
+}
+
+/* ===== 抽屉遮罩 ===== */
+.sidebar-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 139;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+.sidebar-overlay.show {
+  opacity: 1; visibility: visible;
+}
+
 /* ===== Responsive ===== */
 @media (max-width:700px) {
   .elem-grid { grid-template-columns:repeat(2,1fr); }
-  .app-container { flex-direction:column; }
-  .sidebar { width:100%; flex-shrink:1; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--border); padding-bottom:4px; position:relative; }
-  .sidebar-brand { display:flex; align-items:center; gap:8px; padding:4px 10px; flex-shrink:0; }
-  .sidebar-brand .accent { font-size:.78rem; }
-  .sidebar-inline-player { display:none; }
-  .sidebar-progress-bar { display:none; }
-  .sidebar-nav { flex-direction:row; gap:2px; padding:4px; overflow-x:auto; }
-  .sidebar-btn { font-size:.7rem; padding:6px 10px; white-space:nowrap; flex-shrink:0; }
-  .sidebar-toggle { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; flex-shrink:0; border:none; background:var(--bg); color:var(--text-secondary); border-radius:6px; cursor:pointer; font-size:1rem; margin:0 2px; }
-  .sidebar-toggle:hover { color:var(--accent); }
-  .sidebar.collapsed .sidebar-nav { display:none; }
-  .sidebar.collapsed .sidebar-inline-player { display:none; }
-  .sidebar.collapsed .sidebar-progress-bar { display:none; }
-  .sidebar.collapsed .sidebar-brand .accent { display:none; }
-  .sidebar.collapsed .sidebar-brand { padding:4px 6px; }
-  .sidebar.collapsed { width:auto; min-width:44px; }
-  .main-content { width:100%; padding:12px 10px 48px; }
-  .topic-bar .topic-title { font-size:.76rem; }
-  .weight-row { flex-wrap:wrap; }
-  .review-textarea { min-height:140px; }
+  .app-container { flex-direction:column; padding-top:48px; }
+
+  .mobile-topbar { display: flex; }
+
+  /* 抽屉式侧边栏 */
+  .sidebar {
+    position: fixed; top: 48px; left: 0;
+    width: min(85vw, 300px); height: calc(100vh - 48px);
+    flex-direction: column; overflow-y: auto;
+    border-right: 1px solid var(--border); border-bottom: none;
+    background: var(--bg-card);
+    z-index: 140;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 2px 0 16px rgba(0,0,0,.2);
+    padding-bottom: 0;
+    flex-shrink: 0;
+  }
+  .sidebar.drawer-open { transform: translateX(0); }
+
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px 8px; flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-brand .accent { font-size: .78rem; }
+  .sidebar-toggle { display: none; }
+  .sidebar-inline-player { display: none; }
+  .sidebar-progress-bar { display: none; }
+
+  .sidebar-nav { flex-direction: column; gap: 2px; padding: 8px; overflow-y: auto; flex: 1; }
+  .sidebar-btn { font-size: .82rem; padding: 11px 14px; white-space: normal; }
+  .sidebar-btn:hover { background: var(--bg); }
+
+  .main-content { width: 100%; padding: 12px 10px 48px; }
+  .topic-bar .topic-title { font-size: .76rem; }
+  .weight-row { flex-wrap: wrap; }
+  .review-textarea { min-height: 140px; }
 }
 @media (min-width:701px) {
-  .sidebar-toggle { display:none; }
+  .sidebar-toggle { display: none; }
 }
 
 /* ===== 功能一：收藏夹独立页 ===== */
@@ -687,6 +744,14 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <div class="gen-progress-container" id="genProgress" style="display:none;"><div class="gen-progress-fill" id="genProgressFill"></div></div>
 
 <div class="app-container">
+<!-- 手机端固定导航条 -->
+<div class="mobile-topbar">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="菜单">☰</button>
+  <span class="topbar-title" id="mobileTopbarTitle">林岛AI</span>
+</div>
+<!-- 抽屉遮罩 -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <aside class="sidebar">
   <div class="sidebar-brand">🚀 <span class="accent" id="appTitle">林岛AI</span><button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开侧边栏">☰</button>
     <div class="sidebar-inline-player"><span id="wjNowPlaying" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">未在播放</span> <button onclick="wjTogglePlay()" id="wjPlayBtn" title="播放/暂停">▶️</button> <button onclick="wjPrevTrack()" title="上一首">⏮</button> <button onclick="wjNextTrack()" title="下一首">⏭</button> <button onclick="wjToggleCycleMode()" id="wjCycleBtn" class="wj-active" title="列表循环">🔁</button> <input type="range" min="0" max="100" value="70" oninput="wjSetVolume(this.value)" id="wjVolumeSlider" title="音量" style="display:inline-block;"></div>
@@ -2525,12 +2590,27 @@ function filterBlockedTopics(candidates) {
 // 标签页
 // ============================================================
 function toggleSidebar() {
-  const s = document.querySelector('.sidebar');
+  var s = document.querySelector('.sidebar');
+  var overlay = document.getElementById('sidebarOverlay');
   if (!s) return;
-  s.classList.toggle('collapsed');
+  var isOpen = s.classList.contains('drawer-open');
+  if (isOpen) {
+    s.classList.remove('drawer-open');
+    if (overlay) overlay.classList.remove('show');
+    document.body.style.overflow = '';
+  } else {
+    s.classList.add('drawer-open');
+    if (overlay) overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 function switchTab(tab) {
+  // 手机端：点击导航项后自动关闭抽屉
+  var sidebar = document.querySelector('.sidebar');
+  if (sidebar && sidebar.classList.contains('drawer-open')) {
+    toggleSidebar();
+  }
   document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   const btn = document.querySelector('[data-tab="'+tab+'"]');
@@ -6364,6 +6444,8 @@ async function init() {
   const appName = loadAppName();
   document.getElementById('appTitle').textContent = appName;
   document.title = appName;
+  var mobileTitle = document.getElementById('mobileTopbarTitle');
+  if (mobileTitle) mobileTitle.textContent = appName;
   loadApiConfig();
   getCustomCategories();
   // Supabase 数据拉取后刷新 UI（可能会更新权重/偏好）
@@ -6393,6 +6475,18 @@ async function init() {
   });
   showIndustryGuideOnce();
   updateDataUsage();
+  // 窗口大小变化时清理抽屉状态
+  window.addEventListener('resize', function() {
+    if (window.innerWidth > 700) {
+      var s = document.querySelector('.sidebar');
+      var overlay = document.getElementById('sidebarOverlay');
+      if (s && s.classList.contains('drawer-open')) {
+        s.classList.remove('drawer-open');
+        if (overlay) overlay.classList.remove('show');
+        document.body.style.overflow = '';
+      }
+    }
+  });
   } catch(e) {
     console.error('init() 异常:', e);
     // 兜底：确保核心 UI 至少渲染出来
