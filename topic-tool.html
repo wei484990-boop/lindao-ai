@@ -6171,14 +6171,6 @@ async function exportAllData() {
     showToast('导出失败：' + e.message);
   }
 }
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('数据导出成功');
-  } catch (e) {
-    console.error('导出失败:', e);
-    showToast('导出失败：' + e.message);
-  }
-}
 
 function triggerImportData() {
   const input = document.getElementById('importFileInput');
