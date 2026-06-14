@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>林岛AI</title>
@@ -1458,6 +1459,410 @@ let expandedCards = new Set();
 let editingCard = null;
 
 // ============================================================
+// Supabase 云端数据库接入层
+// ============================================================
+
+const SUPABASE_URL = 'https://dmbbfbltawzeysmodxok.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRtYmJmYmx0YXd6ZXlzbW9keG9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MDU4MTQsImV4cCI6MjA5Njk4MTgxNH0.fvRLou8R3-1zvmlEu7g2CPfwgQCN0x-QwZJwsHzXOJg';
+
+let supabase = null;
+let supaDeviceId = null;
+let _supaAvailable = false;
+let _supaUserUpserted = false;
+
+async function supaSha256(message) {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getSupaDeviceId() {
+  if (supaDeviceId) return supaDeviceId;
+  let id = localStorage.getItem('usedcar_device_id');
+  if (!id) {
+    id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,10);
+    localStorage.setItem('usedcar_device_id', id);
+  }
+  supaDeviceId = id;
+  return id;
+}
+
+async function supaInit() {
+  if (typeof supabase === 'undefined' && typeof window.supabase === 'undefined') {
+    console.warn('Supabase SDK 未加载，使用本地存储');
+    return;
+  }
+  try {
+    const sb = window.supabase || supabase;
+    supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: false },
+      db: { schema: 'public' }
+    });
+    getSupaDeviceId();
+    _supaAvailable = true;
+    console.log('Supabase 初始化成功, device_id:', supaDeviceId);
+  } catch(e) {
+    console.warn('Supabase 初始化失败:', e.message);
+    _supaAvailable = false;
+  }
+}
+
+async function supaEnsureUser() {
+  if (!_supaAvailable || _supaUserUpserted) return;
+  try {
+    const deviceId = getSupaDeviceId();
+    const { error } = await supabase.from('users').upsert({ device_id: deviceId }, { onConflict: 'device_id' });
+    if (!error) _supaUserUpserted = true;
+  } catch(e) { console.warn('Supabase 用户注册失败:', e.message); }
+}
+
+// === 数据读写封装 ===
+
+// --- 选题历史 (topic_history) ---
+async function supaGetTopicHistory() {
+  if (!_supaAvailable) return null;
+  try {
+    const { data, error } = await supabase.from('topic_history').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false }).limit(500);
+    if (error) throw error;
+    const items = (data || []).map(row => {
+      const d = row.topic_data || {};
+      d.id = row.id;
+      d.time = row.created_at;
+      return d;
+    });
+    safeSet('usedcar_topic_history', items);
+    return items;
+  } catch(e) { console.warn('Supabase 读取选题历史失败:', e.message); return null; }
+}
+async function supaSaveTopicHistory(items) {
+  safeSet('usedcar_topic_history', items);
+  if (!_supaAvailable) return;
+  for (const item of items) {
+    try {
+      const rowId = item._supaId || item._id;
+      const topicData = { ...item };
+      delete topicData.id; delete topicData._supaId; delete topicData._id; delete topicData.time;
+      if (rowId && typeof rowId === 'number') {
+        await supabase.from('topic_history').update({ topic_data: topicData }).eq('id', rowId);
+      } else {
+        await supabase.from('topic_history').insert({ user_id: supaDeviceId, topic_data: topicData });
+      }
+    } catch(e) { console.warn('Supabase 保存选题历史失败:', e.message); }
+  }
+}
+async function supaDeleteTopicHistory(id) {
+  if (!_supaAvailable) return;
+  try { await supabase.from('topic_history').delete().eq('id', id); } catch(e) {}
+}
+async function supaClearTopicHistory() {
+  if (!_supaAvailable) return;
+  try { await supabase.from('topic_history').delete().eq('user_id', supaDeviceId); } catch(e) {}
+}
+
+// --- 灵感库 (inspirations) ---
+async function supaGetInspirations() {
+  if (!_supaAvailable) return null;
+  try {
+    const { data, error } = await supabase.from('inspirations').select('*').eq('user_id', supaDeviceId);
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+    // 重构为 { cats: [...], items: {...} } 格式
+    const items = {};
+    const catIds = new Set();
+    (data || []).forEach(row => {
+      if (!row.content) return;
+      try {
+        const parsed = JSON.parse(row.content);
+        items[row.category + '_' + row.id] = { ...parsed, _supaId: row.id };
+        catIds.add(row.category);
+      } catch(e) {}
+    });
+    const result = { cats: [], items };
+    // 从 user_config 恢复 cats 列表
+    const config = await supaGetUserConfig();
+    if (config && config.inspiration_cats) {
+      result.cats = config.inspiration_cats;
+    } else {
+      result.cats = [...catIds].map(id => ({ id, name: id }));
+    }
+    safeSet('usedcar_inspirations', result);
+    return result;
+  } catch(e) { console.warn('Supabase 读取灵感库失败:', e.message); return null; }
+}
+async function supaSaveInspirations(d) {
+  safeSet('usedcar_inspirations', d);
+  if (!_supaAvailable) return;
+  // 保存 cats 到 user_config
+  try {
+    const config = await supaGetUserConfigRaw();
+    config.inspiration_cats = d.cats || [];
+    await supaSetUserConfigRaw(config);
+  } catch(e) {}
+  // 逐条保存 items
+  const existingIds = new Set();
+  for (const [key, item] of Object.entries(d.items || {})) {
+    try {
+      const content = JSON.stringify({ ...item, _supaId: undefined, id: undefined });
+      const catId = item.catId || key.split('_')[0] || 'default';
+      if (item._supaId) {
+        await supabase.from('inspirations').update({ category: catId, content, file_name: item.fileName || null }).eq('id', item._supaId);
+        existingIds.add(item._supaId);
+      } else {
+        const { data } = await supabase.from('inspirations').insert({ user_id: supaDeviceId, category: catId, content, file_name: item.fileName || null }).select('id');
+        if (data && data[0]) { item._supaId = data[0].id; existingIds.add(data[0].id); }
+      }
+    } catch(e) { console.warn('Supabase 保存灵感条目失败:', e.message); }
+  }
+}
+
+// --- 收藏夹 (favorites) ---
+async function supaGetFavorites() {
+  if (!_supaAvailable) return null;
+  try {
+    const { data, error } = await supabase.from('favorites').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false });
+    if (error) throw error;
+    const items = (data || []).map(row => {
+      const d = row.topic_data || {};
+      d.id = row.id;
+      d.time = row.created_at;
+      return d;
+    });
+    safeSet('usedcar_favorites', items);
+    return items;
+  } catch(e) { console.warn('Supabase 读取收藏夹失败:', e.message); return null; }
+}
+async function supaSaveFavorites(items) {
+  safeSet('usedcar_favorites', items);
+  if (!_supaAvailable) return;
+  // 清空后全量写入
+  try { await supabase.from('favorites').delete().eq('user_id', supaDeviceId); } catch(e) {}
+  for (const item of items) {
+    try {
+      const topicData = { ...item }; delete topicData.id;
+      await supabase.from('favorites').insert({ user_id: supaDeviceId, topic_data: topicData });
+    } catch(e) { console.warn('Supabase 保存收藏失败:', e.message); }
+  }
+}
+
+// --- 用户配置 (user_config) ---
+async function supaGetUserConfigRaw() {
+  if (!_supaAvailable) return {};
+  try {
+    const { data, error } = await supabase.from('user_config').select('config').eq('user_id', supaDeviceId).maybeSingle();
+    if (error && !error.message?.includes('contains 0 rows')) throw error;
+    return (data && data.config) ? data.config : {};
+  } catch(e) { console.warn('Supabase 读取配置失败:', e.message); return {}; }
+}
+async function supaSetUserConfigRaw(config) {
+  if (!_supaAvailable) return;
+  try {
+    const { error } = await supabase.from('user_config').upsert({ user_id: supaDeviceId, config, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) throw error;
+  } catch(e) { console.warn('Supabase 保存配置失败:', e.message); }
+}
+async function supaGetUserConfig() {
+  const raw = await supaGetUserConfigRaw();
+  // 同时缓存所有配置字段到 localStorage
+  if (raw.api) safeSet('usedcar_api_config', raw.api);
+  if (raw.preferences) safeSet('usedcar_prefs', raw.preferences);
+  if (raw.elem_preferences) safeSet('usedcar_elem_prefs', raw.elem_preferences);
+  if (raw.pref_keywords) safeSet('usedcar_pref_kw', raw.pref_keywords);
+  if (raw.industry) localStorage.setItem('wjIndustry', raw.industry);
+  if (raw.custom_categories) safeSet('usedcar_custom_cats', raw.custom_categories);
+  if (raw.blocked_keywords) safeSet('usedcar_blocked_keywords', raw.blocked_keywords);
+  if (raw.blocked_presets) safeSet('usedcar_blocked_presets', raw.blocked_presets);
+  if (raw.pending_revise) safeSet('usedcar_pending_revise', raw.pending_revise);
+  if (raw.suggestions) safeSet('usedcar_topic_suggestions', raw.suggestions);
+  if (raw.contexts) {
+    for (const [k, v] of Object.entries(raw.contexts)) {
+      if (v) localStorage.setItem('wjContext_' + k, v);
+    }
+  }
+  return raw;
+}
+async function supaSaveUserConfig() {
+  const config = {};
+  try { config.api = safeGet('usedcar_api_config', { endpoint:'', key:'', enabled:false, models:{} }); } catch(e) {}
+  try { config.preferences = safeGet('usedcar_prefs', {}); } catch(e) {}
+  try { config.elem_preferences = safeGet('usedcar_elem_prefs', {}); } catch(e) {}
+  try { config.pref_keywords = safeGet('usedcar_pref_kw', {}); } catch(e) {}
+  try { config.industry = localStorage.getItem('wjIndustry') || '二手车'; } catch(e) {}
+  try { config.custom_categories = safeGet('usedcar_custom_cats', {}); } catch(e) {}
+  try { config.blocked_keywords = safeGet('usedcar_blocked_keywords', []); } catch(e) {}
+  try { config.blocked_presets = safeGet('usedcar_blocked_presets', []); } catch(e) {}
+  try { config.pending_revise = safeGet('usedcar_pending_revise', []); } catch(e) {}
+  try { config.suggestions = safeGet('usedcar_topic_suggestions', {}); } catch(e) {}
+  config.contexts = {};
+  for (let i=0; i<localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('wjContext_')) {
+      config.contexts[k.replace('wjContext_', '')] = localStorage.getItem(k);
+    }
+  }
+  await supaSetUserConfigRaw(config);
+}
+
+// --- 训练反馈 (training_feedback) ---
+async function supaGetTrainingFeedback() {
+  if (!_supaAvailable) return null;
+  try {
+    const { data, error } = await supabase.from('training_feedback').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false });
+    if (error) throw error;
+    const batchItems = [];
+    const reviewItems = [];
+    (data || []).forEach(row => {
+      const d = row.feedback_data || {};
+      d.id = row.id;
+      d.time = row.created_at;
+      d.type = d.type || row.feedback_type;
+      if (row.feedback_type === 'batch' || row.feedback_type === 'train') {
+        batchItems.push(d);
+      } else {
+        reviewItems.push(d);
+      }
+    });
+    safeSet('usedcar_training_history', batchItems);
+    return { batch: batchItems, review: reviewItems };
+  } catch(e) { console.warn('Supabase 读取训练反馈失败:', e.message); return null; }
+}
+async function supaSaveTrainingFeedback(type, item) {
+  safeSet('usedcar_training_history', []);
+  if (!_supaAvailable) return;
+  try {
+    const feedbackData = { ...item };
+    await supabase.from('training_feedback').insert({ user_id: supaDeviceId, feedback_type: type, feedback_data: feedbackData });
+  } catch(e) { console.warn('Supabase 保存训练反馈失败:', e.message); }
+}
+
+// --- 黑名单 (blocklist) ---
+async function supaGetBlocklist() {
+  if (!_supaAvailable) return null;
+  try {
+    const { data, error } = await supabase.from('blocklist').select('keyword').eq('user_id', supaDeviceId);
+    if (error) throw error;
+    const keywords = (data || []).map(r => r.keyword);
+    safeSet('usedcar_blocked_keywords', keywords);
+    const presets = (data || []).filter(r => r.keyword.startsWith('_preset_')).map(r => r.keyword.replace('_preset_', ''));
+    if (presets.length) safeSet('usedcar_blocked_presets', presets);
+    return { keywords, presets };
+  } catch(e) { console.warn('Supabase 读取黑名单失败:', e.message); return null; }
+}
+async function supaSaveBlocklist(keywords, presets) {
+  safeSet('usedcar_blocked_keywords', keywords || []);
+  safeSet('usedcar_blocked_presets', presets || []);
+  if (!_supaAvailable) return;
+  try {
+    await supabase.from('blocklist').delete().eq('user_id', supaDeviceId);
+    const rows = (keywords || []).map(k => ({ user_id: supaDeviceId, keyword: k }));
+    const presetRows = (presets || []).map(p => ({ user_id: supaDeviceId, keyword: '_preset_' + p }));
+    const allRows = [...rows, ...presetRows];
+    if (allRows.length > 0) await supabase.from('blocklist').insert(allRows);
+  } catch(e) { console.warn('Supabase 保存黑名单失败:', e.message); }
+}
+
+// === 页面加载时从 Supabase 拉取所有数据 ===
+async function supaPullAllData() {
+  if (!_supaAvailable) return;
+  await supaEnsureUser();
+  try {
+    await supaGetUserConfig();
+  } catch(e) { console.warn('拉取配置失败:', e); }
+  try {
+    const hist = await supaGetTopicHistory();
+    if (hist && hist.length > 0) {
+      // 同步到 IndexedDB
+      try {
+        for (const item of hist) {
+          await idbPut('topicHistory', item);
+        }
+      } catch(e) {}
+    }
+  } catch(e) { console.warn('拉取选题历史失败:', e); }
+  try {
+    const insp = await supaGetInspirations();
+    if (insp && insp.cats) {
+      wjInspirations = insp;
+      try { await idbPut('inspirations', Object.assign({}, insp, { id: 'main' })); } catch(e) {}
+    }
+  } catch(e) { console.warn('拉取灵感库失败:', e); }
+  try {
+    const fav = await supaGetFavorites();
+    if (fav && fav.length > 0) {
+      try {
+        for (const item of fav) {
+          await idbPut('favorites_store', item);
+        }
+      } catch(e) {}
+    }
+  } catch(e) { console.warn('拉取收藏夹失败:', e); }
+  try {
+    const fb = await supaGetTrainingFeedback();
+    if (fb) {
+      if (fb.batch.length) {
+        try { for (const item of fb.batch) { await idbPut('trainingFeedback', item); } } catch(e) {}
+      }
+      if (fb.review.length) {
+        try { for (const item of fb.review) { await idbPut('reviewTrainingFeedback', item); } } catch(e) {}
+      }
+    }
+  } catch(e) { console.warn('拉取训练反馈失败:', e); }
+  try {
+    await supaGetBlocklist();
+  } catch(e) { console.warn('拉取黑名单失败:', e); }
+}
+
+// === 数据导出（从 Supabase） ===
+async function supaExportAllData() {
+  if (!_supaAvailable) return null;
+  const result = { version: '3.0', supabase: true, exportTime: new Date().toISOString(), tables: {} };
+  try {
+    const tables = ['topic_history', 'inspirations', 'favorites', 'user_config', 'training_feedback', 'blocklist'];
+    for (const table of tables) {
+      const { data, error } = await supabase.from(table).select('*').eq('user_id', supaDeviceId);
+      if (!error) result.tables[table] = data || [];
+    }
+    return result;
+  } catch(e) { console.warn('Supabase 导出失败:', e.message); return null; }
+}
+
+// === 数据导入（到 Supabase） ===
+async function supaImportAllData(importData) {
+  if (!_supaAvailable || !importData || !importData.tables) return;
+  const tables = importData.tables;
+  if (tables.topic_history && tables.topic_history.length) {
+    for (const row of tables.topic_history) {
+      try { await supabase.from('topic_history').insert({ user_id: supaDeviceId, topic_data: row.topic_data || row, created_at: row.created_at }); } catch(e) {}
+    }
+  }
+  if (tables.inspirations && tables.inspirations.length) {
+    for (const row of tables.inspirations) {
+      try { await supabase.from('inspirations').insert({ user_id: supaDeviceId, category: row.category, content: row.content, file_name: row.file_name, created_at: row.created_at }); } catch(e) {}
+    }
+  }
+  if (tables.favorites && tables.favorites.length) {
+    for (const row of tables.favorites) {
+      try { await supabase.from('favorites').insert({ user_id: supaDeviceId, topic_data: row.topic_data || row, created_at: row.created_at }); } catch(e) {}
+    }
+  }
+  if (tables.user_config && tables.user_config.length) {
+    const cfg = tables.user_config[0];
+    try { await supabase.from('user_config').upsert({ user_id: supaDeviceId, config: cfg.config || cfg, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }); } catch(e) {}
+  }
+  if (tables.training_feedback && tables.training_feedback.length) {
+    for (const row of tables.training_feedback) {
+      try { await supabase.from('training_feedback').insert({ user_id: supaDeviceId, feedback_type: row.feedback_type, feedback_data: row.feedback_data || row, created_at: row.created_at }); } catch(e) {}
+    }
+  }
+  if (tables.blocklist && tables.blocklist.length) {
+    for (const row of tables.blocklist) {
+      try { await supabase.from('blocklist').insert({ user_id: supaDeviceId, keyword: row.keyword, created_at: row.created_at }); } catch(e) {}
+    }
+  }
+}
+
+
+// ============================================================
 
 // ===== IndexedDB 封装 =====
 let _idb = null;
@@ -1662,7 +2067,7 @@ function loadAppName() { return '林岛AI'; }
 
 // 类别
 function getCustomCategories() { customCategories = safeGet('usedcar_custom_cats', {}); return customCategories; }
-function saveCustomCategories() { safeSet('usedcar_custom_cats', customCategories); }
+function saveCustomCategories() { safeSet('usedcar_custom_cats', customCategories); supaSaveUserConfig().catch(e => {}); }
 function getAllCategories() { return { ...PRESET_CATS, ...getCustomCategories() }; }
 
 // API
@@ -1871,6 +2276,7 @@ function saveApiConfig() {
     models,
     enabled: document.getElementById('apiEnabled')?.checked||false,
   });
+  supaSaveUserConfig().catch(e => {});
 }
 
 function loadApiConfig() {
@@ -1912,13 +2318,13 @@ function loadApiConfig() {
 const DEFAULT_PREFS = {}; Object.keys(PRESET_CATS).forEach(k => DEFAULT_PREFS[k]=1);
 const DEFAULT_ELEM_PREFS = {}; ELEM_KEYS.forEach(k => DEFAULT_ELEM_PREFS[k]=1);
 function getPreferences() { return safeGet('usedcar_prefs', DEFAULT_PREFS); }
-function savePreferences(p) { safeSet('usedcar_prefs', p); }
+function savePreferences(p) { safeSet('usedcar_prefs', p); supaSaveUserConfig().catch(e => {}); }
 function getElemPreferences() { return safeGet('usedcar_elem_prefs', DEFAULT_ELEM_PREFS); }
-function saveElemPreferences(p) { safeSet('usedcar_elem_prefs', p); }
+function saveElemPreferences(p) { safeSet('usedcar_elem_prefs', p); supaSaveUserConfig().catch(e => {}); }
 function getPrefKeywords() { return safeGet('usedcar_pref_kw', {}); }
-function savePrefKeywords(kw) { safeSet('usedcar_pref_kw', kw); }
+function savePrefKeywords(kw) { safeSet('usedcar_pref_kw', kw); supaSaveUserConfig().catch(e => {}); }
 function getFavorites() { return safeGet('usedcar_favorites', []); }
-function saveFavorites(f) { safeSet('usedcar_favorites', f); }
+function saveFavorites(f) { safeSet('usedcar_favorites', f); supaSaveFavorites(f).catch(e => {}); }
 
 
 // ============================================================
@@ -1937,6 +2343,10 @@ function wjGetInspirations() {
 }
 
 async function wjGetInspirationsAsync() {
+  // 优先 Supabase
+  const supaData = await supaGetInspirations();
+  if (supaData && supaData.cats) return supaData;
+  // 降级 IndexedDB
   try {
     const data = await idbGet('inspirations', 'main');
     if (data && data.cats) return data;
@@ -1946,12 +2356,13 @@ async function wjGetInspirationsAsync() {
 function wjSaveInspirations(d) {
   safeSet('usedcar_inspirations', d);
   try { idbPut('inspirations', Object.assign({}, d, { id: 'main' })); } catch {}
+  supaSaveInspirations(d).catch(e => {});
 }
 
 let wjSelectedInspirations = [];
 
 function wjGetPendingRevise() { return safeGet('usedcar_pending_revise', []); }
-function wjSavePendingRevise(p) { safeSet('usedcar_pending_revise', p); }
+function wjSavePendingRevise(p) { safeSet('usedcar_pending_revise', p); supaSaveUserConfig().catch(e => {}); }
 
 function wjGetMusicLibrary() {
   return safeGet('usedcar_music_library', {
@@ -2038,15 +2449,23 @@ let wjActiveInspireCat = null;
 // 功能一：选题建议 localStorage
 // ============================================================
 function getSuggestions() { return safeGet('usedcar_topic_suggestions', {}); }
-function saveSuggestions(s) { safeSet('usedcar_topic_suggestions', s); }
+function saveSuggestions(s) { safeSet('usedcar_topic_suggestions', s); supaSaveUserConfig().catch(e => {}); }
 
 // ============================================================
 // 功能二：黑名单 localStorage
 // ============================================================
 function getBlockedKeywords() { return safeGet('usedcar_blocked_keywords', []); }
-function saveBlockedKeywords(bk) { safeSet('usedcar_blocked_keywords', bk); }
+function saveBlockedKeywords(bk) { 
+  safeSet('usedcar_blocked_keywords', bk); 
+  const presets = safeGet('usedcar_blocked_presets', []); 
+  supaSaveBlocklist(bk, presets).catch(e => {}); 
+}
 function getBlockedPresets() { return safeGet('usedcar_blocked_presets', []); }
-function saveBlockedPresets(bp) { safeSet('usedcar_blocked_presets', bp); }
+function saveBlockedPresets(bp) { 
+  safeSet('usedcar_blocked_presets', bp); 
+  const keywords = safeGet('usedcar_blocked_keywords', []); 
+  supaSaveBlocklist(keywords, bp).catch(e => {}); 
+}
 
 // 提取标题中的核心实词
 function extractTopicKeywords(title) {
@@ -2149,6 +2568,8 @@ async function saveTopicsToHistory(topics) {
     history.unshift(...batch);
     save('usedcar_topic_history', history);
   }
+  // 同步到 Supabase
+  supaSaveTopicHistory(batch).catch(e => {});
   updateHistoryBadge();
 }
 
@@ -3689,6 +4110,7 @@ let _reviewFeedbackState = {};
 async function saveReviewFeedback(item) {
   item.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   try { await idbPut('reviewTrainingFeedback', item); } catch (e) { console.error('保存审核反馈失败:', e); }
+  supaSaveTrainingFeedback('review', item).catch(e => {});
 }
 
 async function getReviewFeedbackList(limit = 10) {
@@ -4918,6 +5340,7 @@ function getIndustry() {
 }
 function setIndustry(name) {
   localStorage.setItem('wjIndustry', name);
+  supaSaveUserConfig().catch(e => {});
   const badge = document.getElementById('industryBadge');
   if (badge) badge.textContent = name;
   document.querySelectorAll('.industry-card').forEach(c => c.classList.toggle('selected', c.dataset.industry === name));
@@ -4935,6 +5358,8 @@ async function saveTrainingHistory(h) {
     await idbClear('trainingFeedback');
     for (const item of h) await idbPut('trainingFeedback', item);
   } catch {}
+  // 同步到 Supabase（全量替换，先删后批量写入）
+  supaSaveTrainingFeedback('batch', h).catch(e => {});
 }
 
 function openIndustryModal() {
@@ -5240,6 +5665,7 @@ function saveAllContexts() {
     if (trimmed) { localStorage.setItem('wjContext_'+k, trimmed); }
     else { localStorage.removeItem('wjContext_'+k); }
   });
+  supaSaveUserConfig().catch(e => {});
   const status = document.getElementById('wjContextStatus');
   if (status) { status.textContent = '已保存'; status.style.color = 'var(--accent)'; setTimeout(()=>{status.textContent='';},2000); }
 }
@@ -5692,46 +6118,25 @@ async function collectIndexedDB() {
 }
 
 async function exportAllData() {
-  // 浏览器兼容：在浏览器环境下使用 Blob 下载，Electron 环境可使用 fs.writeFileSync
-  if (typeof require !== 'undefined') {
-    try { var fs = require('fs'); var path = require('path'); } catch(e) { /* 降级到浏览器模式 */ }
-  }
   try {
-    // 收集所有 usedcar_ 前缀 localStorage
-    const lsData = {};
-    const usedcarKeys = getAllUsedcarKeys();
-    for (const k of usedcarKeys) {
-      lsData[k] = localStorage.getItem(k);
-    }
-    // 收集其他 non-usedcar_ 的 localStorage（wj 相关等）
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k.startsWith('usedcar_')) {
-        lsData[k] = localStorage.getItem(k);
-      }
-    }
-
-    // 收集 IndexedDB
-    const idbData = await collectIndexedDB();
-
-    // 格式化时间
+    showToast('正在从云端导出数据…');
+    const exportData = await supaExportAllData();
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const exportTime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-
-    const exportData = {
-      version: '2.3',
-      exportTime: exportTime,
-      localStorage: lsData,
-      indexedDB: idbData
-    };
-
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
     a.download = `选题雷达备份_${dateStr}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('数据导出成功');
+  } catch (e) {
+    console.error('导出失败:', e);
+    showToast('导出失败：' + e.message);
+  }
+}
     a.click();
     URL.revokeObjectURL(url);
     showToast('数据导出成功');
@@ -5754,57 +6159,37 @@ async function handleImportFile(event) {
   try {
     const text = await file.text();
     const json = JSON.parse(text);
+    // 支持新旧格式：Supabase导出格式和新旧本地格式
+    const isSupabase = json._supabase_export && Array.isArray(json.data);
+    const isNewLocal = json.localStorage && json.indexedDB;
+    const isOldLocal = json.data && !json._supabase_export;
 
-    // 兼容新旧格式
-    let lsData = {}, idbData = {};
-    if (json.localStorage && json.indexedDB) {
-      // 新格式
-      lsData = json.localStorage;
-      idbData = json.indexedDB;
-    } else if (json.data) {
-      // 旧格式兼容
-      const d = json.data;
-      if (d.preferences) lsData['usedcar_preferences'] = JSON.stringify(d.preferences);
-      if (d.blockedKeywords) lsData['usedcar_blocked_keywords'] = JSON.stringify(d.blockedKeywords);
-      if (d.customCategories) lsData['usedcar_custom_categories'] = JSON.stringify(d.customCategories);
-      if (d.industry) lsData['wjIndustry'] = d.industry;
-      if (d.apiConfig) {
-        const existing = getApiConfig();
-        Object.assign(existing, d.apiConfig);
-        saveApiConfig();
-      }
-      if (d.topicHistory) idbData['topicHistory'] = d.topicHistory;
-      if (d.inspirations) idbData['inspirations'] = [d.inspirations];
-      if (d.trainingFeedback) idbData['trainingFeedback'] = d.trainingFeedback;
-      if (d.reviewTrainingFeedback) idbData['reviewTrainingFeedback'] = d.reviewTrainingFeedback;
-      if (d.preferences) lsData['usedcar_preferences'] = JSON.stringify(d.preferences);
+    let recordCount = 0;
+    if (isSupabase) {
+      recordCount = json.data.length;
+    } else if (isNewLocal) {
+      recordCount = Object.keys(json.localStorage).length + Object.values(json.indexedDB).reduce((s, r) => s + (Array.isArray(r) ? r.length : 0), 0);
+    } else if (isOldLocal) {
+      recordCount = json.data.topicHistory ? json.data.topicHistory.length : 0;
     } else {
       throw new Error('无效的备份文件格式');
-    }
-
-    // 统计
-    const lsCount = Object.keys(lsData).length;
-    let idbRecordCount = 0;
-    for (const [store, records] of Object.entries(idbData)) {
-      idbRecordCount += Array.isArray(records) ? records.length : 0;
     }
 
     // 预览
     if (preview) {
       preview.style.display = 'block';
-      preview.innerHTML = `<strong>导入预览：</strong><br>
-        localStorage ${lsCount} 项，IndexedDB ${idbRecordCount} 条记录<br>
-        <span style="color:var(--danger);">当前数据将被覆盖，导入前会自动备份</span>`;
+      preview.innerHTML = `<strong>导入预览：</strong><br>${recordCount} 条记录<br>
+        <span style="color:var(--danger);">导入前会自动备份当前数据到云端</span>`;
     }
 
-    // 二次确认
+    // 确认
     const confirmed = await new Promise(resolve => {
       const overlay = document.createElement('div');
       overlay.className = 'confirm-overlay';
       overlay.innerHTML = `<div class="confirm-box"><h4>确认导入数据</h4>
-        <p>将覆盖 ${lsCount} 项 localStorage + ${idbRecordCount} 条 IndexedDB 记录<br>
-        <span style="color:var(--danger);">导入前会自动备份当前数据，确认覆盖？</span></p>
-        <div class="confirm-btns"><button class="confirm-yes">确认覆盖</button><button class="confirm-no">取消</button></div></div>`;
+        <p>将导入 ${recordCount} 条记录到 Supabase 云端<br>
+        <span style="color:var(--danger);">导入前会自动备份当前云端数据</span></p>
+        <div class="confirm-btns"><button class="confirm-yes">确认导入</button><button class="confirm-no">取消</button></div></div>`;
       document.body.appendChild(overlay);
       overlay.querySelector('.confirm-yes').onclick = () => { document.body.removeChild(overlay); resolve(true); };
       overlay.querySelector('.confirm-no').onclick = () => { document.body.removeChild(overlay); resolve(false); };
@@ -5816,39 +6201,23 @@ async function handleImportFile(event) {
       return;
     }
 
-    // 导入前自动备份当前数据
+    // 导入前备份
     try {
       await exportAllDataSilent();
-      showToast('已自动备份当前数据');
     } catch (be) {
       console.warn('自动备份失败:', be);
     }
 
-    // 逐条写入 localStorage
-    for (const [k, v] of Object.entries(lsData)) {
-      localStorage.setItem(k, v);
-    }
-
-    // 逐条写入 IndexedDB
-    for (const [storeName, records] of Object.entries(idbData)) {
-      if (!Array.isArray(records)) continue;
-      try {
-        await idbClear(storeName);
-        for (const item of records) {
-          await idbPut(storeName, item);
-        }
-      } catch (e) {
-        console.warn(`写入 IndexedDB store "${storeName}" 失败:`, e);
-      }
-    }
-
-    // 重新读取 inspirations 内存状态
+    // 使用 supaImportAllData 导入
+    await supaImportAllData(json);
+    
+    // 重新拉取数据回填本地
+    await supaPullAllData();
     try { wjInspirations = await wjGetInspirationsAsync(); } catch (e) {}
 
     if (preview) preview.style.display = 'none';
-    showToast(`导入成功，共恢复 ${lsCount} 条 localStorage + ${idbRecordCount} 条 IndexedDB 记录`);
+    showToast(`导入成功，共 ${recordCount} 条记录`);
     await updateDataUsage();
-    // 延时刷新页面
     setTimeout(() => { location.reload(); }, 800);
   } catch (e) {
     console.error('导入失败:', e);
@@ -5860,24 +6229,22 @@ async function handleImportFile(event) {
 
 /** 静默导出（用于导入前自动备份） */
 async function exportAllDataSilent() {
-  const lsData = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    lsData[k] = localStorage.getItem(k);
+  try {
+    const exportData = await supaExportAllData();
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = `选题雷达备份_自动_${dateStr}.json`;
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.warn('静默备份失败:', e);
+    throw e;
   }
-  const idbData = await collectIndexedDB();
-  const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const exportTime = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  const backupData = { version: '2.3', exportTime, localStorage: lsData, indexedDB: idbData };
-  const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  a.download = `选题雷达备份_自动_${dateStr}.json`;
-  a.href = url;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 /** 清空全部数据确认 */
@@ -5959,6 +6326,8 @@ async function updateDataUsage() {
 async function init() {
   try {
   await migrateToIndexedDB();
+  // 从 Supabase 云端拉取最新数据，回填到本地
+  try { await supaPullAllData(); } catch(e) { console.warn('Supabase 数据拉取失败，使用本地缓存:', e); }
   const theme = loadTheme(); setTheme(theme);
   const appName = loadAppName();
   document.getElementById('appTitle').textContent = appName;
