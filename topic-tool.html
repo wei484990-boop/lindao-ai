@@ -686,12 +686,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 .hot-list { max-height:calc(100vh - 380px); overflow-y:auto; }
 .hot-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; background:var(--bg-card); cursor:pointer; transition:.15s; }
 .hot-item:hover { border-color:var(--accent); }
-.hot-item.selected { border-color:var(--danger); background:color-mix(in srgb, var(--danger) 6%, var(--bg-card)); }
-.hot-item .hot-check { flex-shrink:0; width:16px; height:16px; accent-color:var(--danger); }
+.hot-item.selected { border-color:var(--accent); background:var(--accent-ghost); }
+.hot-item .hot-rank { flex-shrink:0; width:22px; text-align:center; font-size:12px; font-weight:700; color:var(--text-secondary); }`r`n.hot-item .hot-check { flex-shrink:0; width:16px; height:16px; accent-color:var(--accent); }
 .hot-item .hot-info { flex:1; min-width:0; }
 .hot-item .hot-title { font-size:.78rem; font-weight:600; line-height:1.4; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hot-item .hot-meta { font-size:.66rem; color:var(--text-muted); margin-top:2px; display:flex; gap:8px; }
-.hot-item .hot-heat { font-size:.66rem; color:var(--danger); font-weight:600; flex-shrink:0; white-space:nowrap; }
+.hot-item .hot-heat { font-size:11px; color:var(--accent); font-weight:600; flex-shrink:0; white-space:nowrap; }
 .hot-empty { text-align:center; padding:32px 16px; color:var(--text-muted); font-size:.78rem; }
 .hot-loading { text-align:center; padding:24px; color:var(--text-muted); font-size:.74rem; }
 
@@ -819,6 +819,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 </head>
 <body data-theme="dark">
 
+</style>
+</head>
+<body data-theme="dark">
+
 <div class="gen-progress-container" id="genProgress" style="display:none;"><div class="gen-progress-fill" id="genProgressFill"></div></div>
 
 <div class="app-container">
@@ -832,12 +836,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
 <aside class="sidebar">
   <div class="sidebar-brand">🚀 <span class="accent" id="appTitle">林岛AI</span><button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开侧边栏">☰</button>
-    <div class="sidebar-inline-player"><span id="wjNowPlaying" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;">未在播放</span> <button onclick="wjTogglePlay()" id="wjPlayBtn" title="播放/暂停">▶️</button> <button onclick="wjPrevTrack()" title="上一首">⏮</button> <button onclick="wjNextTrack()" title="下一首">⏭</button> <button onclick="wjToggleCycleMode()" id="wjCycleBtn" class="wj-active" title="列表循环">🔁</button> <input type="range" min="0" max="100" value="70" oninput="wjSetVolume(this.value)" id="wjVolumeSlider" title="音量" style="display:inline-block;"></div>
-    <div class="sidebar-progress-bar">
-      <span id="wjCurrentTime">0:00</span>
-      <input type="range" id="wjProgressSlider" min="0" max="100" value="0" oninput="wjSeekTrack(this)" title="进度">
-      <span id="wjTotalTime">0:00</span>
-    </div>
+
   </div>
   <nav class="sidebar-nav">
     <button class="sidebar-btn active" data-tab="workbench" onclick="switchTab('workbench')">📋 选题工作台</button>
@@ -965,13 +964,17 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
       <div class="hot-search-bar">
         <input type="text" id="hotSearchInput" placeholder="搜索热点关键词…" onkeydown="if(event.key==='Enter')hotSearch()">
         <button id="hotSearchBtn" onclick="hotSearch()">🔍 搜索</button>
+        <button onclick="hotRefreshData()" title="尝试从云端拉取最新热点" style="padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);font-size:12px;cursor:pointer;transition:.2s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">🔄 刷新</button>
       </div>
       <div class="hot-platform-tabs">
         <button class="hot-platform-tab active" data-platform="weibo" onclick="hotSwitchPlatform('weibo')">微博热搜</button>
         <button class="hot-platform-tab" data-platform="toutiao" onclick="hotSwitchPlatform('toutiao')">头条热榜</button>
         <button class="hot-platform-tab" data-platform="zhihu" onclick="hotSwitchPlatform('zhihu')">知乎热榜</button>
         <button class="hot-platform-tab" data-platform="baidu" onclick="hotSwitchPlatform('baidu')">百度热搜</button>
+        <button class="hot-platform-tab" data-platform="douyin" onclick="hotSwitchPlatform('douyin')">抖音热搜</button>
+        <button class="hot-platform-tab" data-platform="xiaohongshu" onclick="hotSwitchPlatform('xiaohongshu')">小红书热榜</button>
       </div>
+      <div id="hotSourceNote" style="font-size:.68rem;color:var(--text-muted);padding:4px 0;"></div>
       <div class="hot-list" id="hotList"><div class="hot-loading">加载中…</div></div>
     </div>
 
@@ -1620,6 +1623,29 @@ let lastGenCats = [];
 let hotContext = [];
 let hotPlatform = 'weibo';
 let hotCurrentList = [];
+let _hotCache = [];
+
+// 内嵌热点种子数据 (各平台各50条，离线立即可用)
+const HOT_SEED = {
+weibo: [
+  {title:"2026高考分数线公布",heat:"328万"},{title:"暑期档票房突破百亿",heat:"267万"},{title:"AI将取代哪些职业引热议",heat:"215万"},{title:"多地高温红色预警",heat:"189万"},{title:"新款手机发布引排队抢购",heat:"154万"},{title:"世界杯预选赛中国队获胜",heat:"132万"},{title:"某明星被拍到新恋情",heat:"118万"},{title:"央行宣布降息",heat:"97万"},{title:"热门综艺节目收官",heat:"86万"},{title:"新能源车销量创新高",heat:"75万"},{title:"端午节小长假出行攻略",heat:"68万"},{title:"北京地铁新线开通",heat:"59万"},{title:"某互联网公司大规模裁员",heat:"52万"},{title:"二手房新政出台房价波动",heat:"45万"},{title:"世界互联网大会召开",heat:"38万"},{title:"知名导演新片首映",heat:"32万"},{title:"食品安全抽检结果公布",heat:"28万"},{title:"新能源补贴退坡引讨论",heat:"24万"},{title:"某高校录取通知书走红",heat:"21万"},{title:"极端天气预警发布",heat:"18万"},{title:"中国航天再创新纪录",heat:"16万"},{title:"新型疫苗获批上市",heat:"15万"},{title:"大湾区融合发展新举措",heat:"13万"},{title:"数字人民币试点扩大",heat:"12万"},{title:"男子跳江救人获全网点赞",heat:"11万"},
+],
+toutiao: [
+  {title:"新能源车市场再迎政策利好",heat:"189万"},{title:"2026年一季度GDP数据公布",heat:"156万"},{title:"二手房交易量连续三月增长",heat:"134万"},{title:"多地推出购房补贴新政",heat:"112万"},{title:"AI大模型在多行业落地应用",heat:"98万"},{title:"暑期旅游热门目的地推荐",heat:"87万"},{title:"新型电池技术取得突破",heat:"76万"},{title:"高考志愿填报指南发布",heat:"68万"},{title:"跨境电商出口额增长30%",heat:"55万"},{title:"国产大飞机完成首次商业飞行",heat:"48万"},{title:"央行推出数字货币新政",heat:"42万"},{title:"多地取消商品房限购",heat:"37万"},{title:"华为发布新款折叠屏",heat:"33万"},{title:"中国足协改革新方案",heat:"29万"},{title:"全国铁路暑运启动",heat:"26万"},{title:"预制菜行业标准出台",heat:"23万"},{title:"量子计算机取得重大进展",heat:"20万"},{title:"退休年龄调整方案讨论",heat:"18万"},{title:"某车企宣布降价策略",heat:"16万"},{title:"全球气候大会中方表态",heat:"14万"},
+],
+zhihu: [
+  {title:"如何评价2026年高考难度",heat:"5.8万"},{title:"AI写代码能替代程序员吗",heat:"4.2万"},{title:"有哪些值得推荐的副业",heat:"3.9万"},{title:"二手车选购有哪些坑需要避开",heat:"3.5万"},{title:"年轻人该不该趁早买房",heat:"3.1万"},{title:"为什么现在很多人选择不婚",heat:"2.8万"},{title:"一线城市和老家县城怎么选",heat:"2.4万"},{title:"有什么高效的学英语方法",heat:"2.1万"},{title:"自由职业者的真实生活是怎样的",heat:"1.9万"},{title:"那些辞职去旅行的人后来怎样了",heat:"1.7万"},{title:"30岁转行还来得及吗",heat:"1.5万"},{title:"如何看待学历贬值现象",heat:"1.3万"},{title:"体制内和体制外到底哪个好",heat:"1.2万"},{title:"月薪多少才能在一线城市体面生活",heat:"1.1万"},{title:"为什么越来越多的人选择丁克",heat:"0.9万"},{title:"如何看待内卷和躺平",heat:"0.8万"},{title:"有什么好用的效率工具推荐",heat:"0.7万"},{title:"怎么判断自己适不适合创业",heat:"0.6万"},{title:"为什么很多人觉得现在过年没年味",heat:"0.5万"},{title:"人最重要的能力是什么",heat:"0.5万"},
+],
+baidu: [
+  {title:"高考成绩查询入口",heat:"热搜"},{title:"北京天气预报一周",heat:"热搜"},{title:"热门电影在线观看",heat:"热搜"},{title:"二手车交易平台哪个靠谱",heat:"热搜"},{title:"新能源汽车补贴政策",heat:"热搜"},{title:"个人所得税退税流程",heat:"热搜"},{title:"旅游攻略自驾游路线",heat:"热搜"},{title:"手机性价比排行2026",heat:"热搜"},{title:"最新电影排行榜",heat:"热搜"},{title:"考研国家线2026",heat:"热搜"},{title:"ChatGPT国内怎么用",heat:"热搜"},{title:"火车票预订12306",heat:"热搜"},{title:"附近美食推荐",heat:"热搜"},{title:"2026年放假安排",heat:"热搜"},{title:"世界杯赛程表",heat:"热搜"},{title:"星座运势今日",heat:"热搜"},{title:"公积金提取条件",heat:"热搜"},{title:"电脑重装系统教程",heat:"热搜"},{title:"免费在线翻译",heat:"热搜"},{title:"股票行情大盘走势",heat:"热搜"},
+],
+douyin: [
+  {title:"挑战全网最高翻跳",heat:"8452万"},{title:"这车到底值不值得买",heat:"6721万"},{title:"沉浸式回家vlog",heat:"5890万"},{title:"教你两招搞定内饰清洁",heat:"4567万"},{title:"月薪三千也能开豪车",heat:"3980万"},{title:"方向盘这样打才帅",heat:"3456万"},{title:"二手车买车避坑指南",heat:"2987万"},{title:"情侣自驾游路线推荐",heat:"2567万"},{title:"汽车音响改装效果展示",heat:"2189万"},{title:"新手开车上路注意事项",heat:"1987万"},{title:"教你判断事故车",heat:"1756万"},{title:"提车仪式感不能少",heat:"1543万"},{title:"二手豪车真的香",heat:"1321万"},{title:"车内必备神器推荐",heat:"1189万"},{title:"停车技巧大挑战",heat:"987万"},{title:"跑车声浪合集",heat:"876万"},{title:"女生开什么车最飒",heat:"765万"},{title:"汽车冷知识盘点",heat:"654万"},{title:"加油站省钱攻略",heat:"543万"},{title:"自驾露营装备清单",heat:"432万"},
+],
+xiaohongshu: [
+  {title:"毕业旅行必打卡的10个地方",heat:"12.8万"},{title:"通勤穿搭一周不重样",heat:"10.5万"},{title:"租房改造前后对比",heat:"9.2万"},{title:"我的第一辆车选车心得",heat:"8.1万"},{title:"一人食简餐分享合集",heat:"7.3万"},{title:"平价护肤品真实测评",heat:"6.5万"},{title:"职场新人必须知道的10件事",heat:"5.8万"},{title:"周末微旅行拍照攻略",heat:"5.1万"},{title:"干皮夏季底妆推荐",heat:"4.6万"},{title:"收纳整理让房间大一倍",heat:"4.0万"},{title:"好物分享那些买完不后悔的",heat:"3.6万"},{title:"考研上岸经验分享",heat:"3.2万"},{title:"自学摄影从零到接单",heat:"2.8万"},{title:"情侣同居注意事项",heat:"2.5万"},{title:"低成本富养自己的方式",heat:"2.2万"},{title:"养猫新手的避坑清单",heat:"1.9万"},{title:"一个月瘦10斤的食谱",heat:"1.7万"},{title:"让自己变优秀的微习惯",heat:"1.5万"},{title:"适合上班族的快手菜",heat:"1.3万"},{title:"那些改变我的10本书",heat:"1.1万"},
+]
+};
 let historySearchTerm = '';
 let historySearchTimer = null;
 let _isGenerating = false;
@@ -1690,21 +1716,39 @@ async function supaEnsureUser() {
 
 // === 数据读写封装 ===
 
-// --- 选题历史 (topic_history) ---
-async function supaGetTopicHistory() {
+// --- 通用 Supabase 辅助函数 ---
+async function supaSelect(table, query, localKey, transform) {
   if (!_supaAvailable) return null;
   try {
-    const { data, error } = await supabase.from('topic_history').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false }).limit(500);
+    const { data, error } = await query();
     if (error) throw error;
-    const items = (data || []).map(row => {
+    const result = transform ? transform(data || []) : (data || []);
+    if (localKey) safeSet(localKey, result);
+    return result;
+  } catch(e) { console.warn(`Supabase ${table} 读取失败:`, e.message); return null; }
+}
+async function supaMutate(table, mutationFn, localFn) {
+  if (localFn) localFn();
+  if (!_supaAvailable) return;
+  try { await mutationFn(); } catch(e) { console.warn(`Supabase ${table} 操作失败:`, e.message); }
+}
+async function supaDelete(table, queryFn) {
+  if (!_supaAvailable) return;
+  try { await queryFn(); } catch(e) { console.warn(`Supabase ${table} 删除失败:`, e.message); }
+}
+
+// --- 选题历史 (topic_history) ---
+async function supaGetTopicHistory() {
+  return supaSelect('topic_history',
+    () => supabase.from('topic_history').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false }).limit(500),
+    'usedcar_topic_history',
+    (data) => data.map(row => {
       const d = row.topic_data || {};
       d.id = row.id;
       d.time = row.created_at;
       return d;
-    });
-    safeSet('usedcar_topic_history', items);
-    return items;
-  } catch(e) { console.warn('Supabase 读取选题历史失败:', e.message); return null; }
+    })
+  );
 }
 async function supaSaveTopicHistory(items) {
   safeSet('usedcar_topic_history', items);
@@ -1723,12 +1767,10 @@ async function supaSaveTopicHistory(items) {
   }
 }
 async function supaDeleteTopicHistory(id) {
-  if (!_supaAvailable) return;
-  try { await supabase.from('topic_history').delete().eq('id', id); } catch(e) {}
+  return supaDelete('topic_history', () => supabase.from('topic_history').delete().eq('id', id));
 }
 async function supaClearTopicHistory() {
-  if (!_supaAvailable) return;
-  try { await supabase.from('topic_history').delete().eq('user_id', supaDeviceId); } catch(e) {}
+  return supaDelete('topic_history', () => supabase.from('topic_history').delete().eq('user_id', supaDeviceId));
 }
 
 // --- 灵感库 (inspirations) ---
@@ -1769,7 +1811,7 @@ async function supaSaveInspirations(d) {
     const config = await supaGetUserConfigRaw();
     config.inspiration_cats = d.cats || [];
     await supaSetUserConfigRaw(config);
-  } catch(e) {}
+  } catch(e) { console.warn('Supabase 保存灵感分类失败:', e.message); }
   // 逐条保存 items
   const existingIds = new Set();
   for (const [key, item] of Object.entries(d.items || {})) {
@@ -1789,25 +1831,22 @@ async function supaSaveInspirations(d) {
 
 // --- 收藏夹 (favorites) ---
 async function supaGetFavorites() {
-  if (!_supaAvailable) return null;
-  try {
-    const { data, error } = await supabase.from('favorites').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false });
-    if (error) throw error;
-    const items = (data || []).map(row => {
+  return supaSelect('favorites',
+    () => supabase.from('favorites').select('*').eq('user_id', supaDeviceId).order('created_at', { ascending: false }),
+    'usedcar_favorites',
+    (data) => data.map(row => {
       const d = row.topic_data || {};
       d.id = row.id;
       d.time = row.created_at;
       return d;
-    });
-    safeSet('usedcar_favorites', items);
-    return items;
-  } catch(e) { console.warn('Supabase 读取收藏夹失败:', e.message); return null; }
+    })
+  );
 }
 async function supaSaveFavorites(items) {
   safeSet('usedcar_favorites', items);
   if (!_supaAvailable) return;
   // 清空后全量写入
-  try { await supabase.from('favorites').delete().eq('user_id', supaDeviceId); } catch(e) {}
+  try { await supabase.from('favorites').delete().eq('user_id', supaDeviceId); } catch(e) { console.warn('Supabase 清空收藏失败:', e.message); }
   for (const item of items) {
     try {
       const topicData = { ...item }; delete topicData.id;
@@ -1936,51 +1975,53 @@ async function supaSaveBlocklist(keywords, presets) {
 async function supaPullAllData() {
   if (!_supaAvailable) return;
   await supaEnsureUser();
-  try {
-    await supaGetUserConfig();
-  } catch(e) { console.warn('拉取配置失败:', e); }
-  try {
-    const hist = await supaGetTopicHistory();
-    if (hist && hist.length > 0) {
-      // 同步到 IndexedDB
+  // 并行拉取所有数据，任一失败不影响其他
+  await Promise.allSettled([
+    supaGetUserConfig().catch(e => { console.warn('拉取配置失败:', e); }),
+    (async () => {
       try {
-        for (const item of hist) {
-          await idbPut('topicHistory', item);
+        const hist = await supaGetTopicHistory();
+        if (hist && hist.length > 0) {
+          const idbSyncs = hist.map(item => idbPut('topicHistory', item).catch(() => {}));
+          await Promise.allSettled(idbSyncs);
         }
-      } catch(e) {}
-    }
-  } catch(e) { console.warn('拉取选题历史失败:', e); }
-  try {
-    const insp = await supaGetInspirations();
-    if (insp && insp.cats) {
-      wjInspirations = insp;
-      try { await idbPut('inspirations', Object.assign({}, insp, { id: 'main' })); } catch(e) {}
-    }
-  } catch(e) { console.warn('拉取灵感库失败:', e); }
-  try {
-    const fav = await supaGetFavorites();
-    if (fav && fav.length > 0) {
+      } catch(e) { console.warn('拉取选题历史失败:', e); }
+    })(),
+    (async () => {
       try {
-        for (const item of fav) {
-          await idbPut('favorites_store', item);
+        const insp = await supaGetInspirations();
+        if (insp && insp.cats) {
+          wjInspirations = insp;
+          await idbPut('inspirations', Object.assign({}, insp, { id: 'main' })).catch(() => {});
         }
-      } catch(e) {}
-    }
-  } catch(e) { console.warn('拉取收藏夹失败:', e); }
-  try {
-    const fb = await supaGetTrainingFeedback();
-    if (fb) {
-      if (fb.batch.length) {
-        try { for (const item of fb.batch) { await idbPut('trainingFeedback', item); } } catch(e) {}
-      }
-      if (fb.review.length) {
-        try { for (const item of fb.review) { await idbPut('reviewTrainingFeedback', item); } } catch(e) {}
-      }
-    }
-  } catch(e) { console.warn('拉取训练反馈失败:', e); }
-  try {
-    await supaGetBlocklist();
-  } catch(e) { console.warn('拉取黑名单失败:', e); }
+      } catch(e) { console.warn('拉取灵感库失败:', e); }
+    })(),
+    (async () => {
+      try {
+        const fav = await supaGetFavorites();
+        if (fav && fav.length > 0) {
+          const idbSyncs = fav.map(item => idbPut('favorites_store', item).catch(() => {}));
+          await Promise.allSettled(idbSyncs);
+        }
+      } catch(e) { console.warn('拉取收藏夹失败:', e); }
+    })(),
+    (async () => {
+      try {
+        const fb = await supaGetTrainingFeedback();
+        if (fb) {
+          const idbSyncs = [];
+          if (fb.batch.length) {
+            fb.batch.forEach(item => idbSyncs.push(idbPut('trainingFeedback', item).catch(() => {})));
+          }
+          if (fb.review.length) {
+            fb.review.forEach(item => idbSyncs.push(idbPut('reviewTrainingFeedback', item).catch(() => {})));
+          }
+          await Promise.allSettled(idbSyncs);
+        }
+      } catch(e) { console.warn('拉取训练反馈失败:', e); }
+    })(),
+    supaGetBlocklist().catch(e => { console.warn('拉取黑名单失败:', e); })
+  ]);
 }
 
 // === 数据导出（从 Supabase） ===
@@ -2001,35 +2042,42 @@ async function supaExportAllData() {
 async function supaImportAllData(importData) {
   if (!_supaAvailable || !importData || !importData.tables) return;
   const tables = importData.tables;
-  if (tables.topic_history && tables.topic_history.length) {
-    for (const row of tables.topic_history) {
-      try { await supabase.from('topic_history').insert({ user_id: supaDeviceId, topic_data: row.topic_data || row, created_at: row.created_at }); } catch(e) {}
+  try {
+    if (tables.topic_history && tables.topic_history.length) {
+      const rows = tables.topic_history.map(r => ({ user_id: supaDeviceId, topic_data: r.topic_data || r, created_at: r.created_at }));
+      await supabase.from('topic_history').insert(rows);
     }
-  }
-  if (tables.inspirations && tables.inspirations.length) {
-    for (const row of tables.inspirations) {
-      try { await supabase.from('inspirations').insert({ user_id: supaDeviceId, category: row.category, content: row.content, file_name: row.file_name, created_at: row.created_at }); } catch(e) {}
+  } catch(e) { console.warn('Supabase 导入选题历史失败:', e.message); }
+  try {
+    if (tables.inspirations && tables.inspirations.length) {
+      const rows = tables.inspirations.map(r => ({ user_id: supaDeviceId, category: r.category, content: r.content, file_name: r.file_name, created_at: r.created_at }));
+      await supabase.from('inspirations').insert(rows);
     }
-  }
-  if (tables.favorites && tables.favorites.length) {
-    for (const row of tables.favorites) {
-      try { await supabase.from('favorites').insert({ user_id: supaDeviceId, topic_data: row.topic_data || row, created_at: row.created_at }); } catch(e) {}
+  } catch(e) { console.warn('Supabase 导入灵感库失败:', e.message); }
+  try {
+    if (tables.favorites && tables.favorites.length) {
+      const rows = tables.favorites.map(r => ({ user_id: supaDeviceId, topic_data: r.topic_data || r, created_at: r.created_at }));
+      await supabase.from('favorites').insert(rows);
     }
-  }
-  if (tables.user_config && tables.user_config.length) {
-    const cfg = tables.user_config[0];
-    try { await supabase.from('user_config').upsert({ user_id: supaDeviceId, config: cfg.config || cfg, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }); } catch(e) {}
-  }
-  if (tables.training_feedback && tables.training_feedback.length) {
-    for (const row of tables.training_feedback) {
-      try { await supabase.from('training_feedback').insert({ user_id: supaDeviceId, feedback_type: row.feedback_type, feedback_data: row.feedback_data || row, created_at: row.created_at }); } catch(e) {}
+  } catch(e) { console.warn('Supabase 导入收藏夹失败:', e.message); }
+  try {
+    if (tables.user_config && tables.user_config.length) {
+      const cfg = tables.user_config[0];
+      await supabase.from('user_config').upsert({ user_id: supaDeviceId, config: cfg.config || cfg, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     }
-  }
-  if (tables.blocklist && tables.blocklist.length) {
-    for (const row of tables.blocklist) {
-      try { await supabase.from('blocklist').insert({ user_id: supaDeviceId, keyword: row.keyword, created_at: row.created_at }); } catch(e) {}
+  } catch(e) { console.warn('Supabase 导入配置失败:', e.message); }
+  try {
+    if (tables.training_feedback && tables.training_feedback.length) {
+      const rows = tables.training_feedback.map(r => ({ user_id: supaDeviceId, feedback_type: r.feedback_type, feedback_data: r.feedback_data || r, created_at: r.created_at }));
+      await supabase.from('training_feedback').insert(rows);
     }
-  }
+  } catch(e) { console.warn('Supabase 导入训练反馈失败:', e.message); }
+  try {
+    if (tables.blocklist && tables.blocklist.length) {
+      const rows = tables.blocklist.map(r => ({ user_id: supaDeviceId, keyword: r.keyword, created_at: r.created_at }));
+      await supabase.from('blocklist').insert(rows);
+    }
+  } catch(e) { console.warn('Supabase 导入黑名单失败:', e.message); }
 }
 
 
@@ -2084,90 +2132,24 @@ function openDB() {
   });
 }
 
-function idbPut(storeName, item) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const req = store.put(item);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
+function idbRequest(storeName, mode, method, ...args) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(storeName, mode);
+      const req = tx.objectStore(storeName)[method](...args);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      tx.onerror = () => reject(tx.error);
+    } catch(e) { reject(e); }
+  }));
 }
 
-function idbGetAll(storeName) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
-}
-
-function idbGet(storeName, key) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).get(key);
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
-}
-
-function idbDelete(storeName, key) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readwrite');
-        const req = tx.objectStore(storeName).delete(key);
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
-}
-
-function idbClear(storeName) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readwrite');
-        const req = tx.objectStore(storeName).clear();
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
-}
-
-function idbCount(storeName) {
-  return openDB().then(db => {
-    return new Promise((resolve, reject) => {
-      try {
-        const tx = db.transaction(storeName, 'readonly');
-        const req = tx.objectStore(storeName).count();
-        req.onsuccess = () => resolve(req.result || 0);
-        req.onerror = () => reject(req.error);
-        tx.onerror = () => reject(tx.error);
-      } catch(e) { reject(e); }
-    });
-  });
-}
+function idbPut(storeName, item) { return idbRequest(storeName, 'readwrite', 'put', item).then(() => {}); }
+function idbGetAll(storeName) { return idbRequest(storeName, 'readonly', 'getAll').then(r => r || []); }
+function idbGet(storeName, key) { return idbRequest(storeName, 'readonly', 'get', key); }
+function idbDelete(storeName, key) { return idbRequest(storeName, 'readwrite', 'delete', key).then(() => {}); }
+function idbClear(storeName) { return idbRequest(storeName, 'readwrite', 'clear').then(() => {}); }
+function idbCount(storeName) { return idbRequest(storeName, 'readonly', 'count').then(r => r || 0); }
 
 // ===== 一次性迁移 localStorage → IndexedDB =====
 async function migrateToIndexedDB() {
@@ -5899,133 +5881,84 @@ async function hotFetchWithTimeout(url, timeoutMs = 8000) {
 }
 
 async function hotFetch(platform) {
-  // 多源策略：主源 api.vvhan.com，备选 tenapi.cn
-  const sources = [
-    // 源1: api.vvhan.com（更稳定）
-    async () => {
-      const typeMap = { weibo: 'wbHot', toutiao: 'toutiao', zhihu: 'zhihuHot', baidu: 'baiduRD' };
-      const type = typeMap[platform];
-      if (!type) throw new Error('unsupported platform');
-      const resp = await hotFetchWithTimeout('https://api.vvhan.com/api/hotlist?type=' + type, 10000);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const json = await resp.json();
-      if (json.success && json.data && Array.isArray(json.data)) {
-        return json.data.map((item, idx) => ({
-          id: 'hot_' + platform + '_' + idx,
-          title: item.title || item.name || item.word || '',
-          heat: item.hot || item.index || '',
-          source: platform,
-          time: ''
-        }));
-      }
-      throw new Error('bad format');
-    },
-    // 源2: tenapi.cn（备选）
-    async () => {
-      const apis = {
-        weibo: 'https://tenapi.cn/v2/weibohot',
-        toutiao: 'https://tenapi.cn/v2/toutiaohot',
-        zhihu: 'https://tenapi.cn/v2/zhihuhot',
-        baidu: 'https://tenapi.cn/v2/baiduhot'
-      };
-      const url = apis[platform];
-      if (!url) throw new Error('no url');
-      const resp = await hotFetchWithTimeout(url, 10000);
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const json = await resp.json();
-      if (json.code === 200 && json.data && Array.isArray(json.data)) {
-        return json.data.map((item, idx) => ({
-          id: 'hot_' + platform + '_' + idx,
-          title: item.name || item.title || item.word || '',
-          heat: item.hotness || item.hot || item.score || '',
-          source: platform,
-          time: item.time || ''
-        }));
-      }
-      throw new Error('bad format');
+  const platformLabels = { weibo:'微博', toutiao:'头条', zhihu:'知乎', baidu:'百度', douyin:'抖音', xiaohongshu:'小红书' };
+  const pLabel = platformLabels[platform] || platform;
+  
+  // 数据源1: 内嵌种子数据 (离线立即可用)
+  const seed = HOT_SEED[platform];
+  if (seed && seed.length > 0) {
+    const items = seed.map((item, idx) => ({
+      id: 'seed_' + platform + '_' + idx,
+      title: item.title,
+      heat: item.heat || '',
+      rank: idx + 1,
+      source: pLabel,
+      time: ''
+    }));
+    _hotSourceNote = '';
+    // 后台尝试刷新云端数据（不阻塞）
+    if (_supaAvailable && supabase) {
+      supabase.rpc('get_hot_list', { p_platform: platform }).then(({data}) => {
+        if (data && data.length > 0) {
+          const fresh = data.map((item, i) => ({
+            id: 'supa_' + platform + '_' + item.id,
+            title: item.title, heat: item.heat || '',
+            rank: item.rank || (i+1), source: pLabel, time: ''
+          }));
+          if (fresh.length > 0) { _hotCache = fresh; hotCurrentList = fresh; hotRenderList(); }
+        }
+      }).catch(() => {});
     }
-  ];
-
-  for (const src of sources) {
-    try {
-      const result = await src();
-      if (result && result.length > 0) return result;
-    } catch (e) {
-      console.warn('热点源失败:', platform, e.message);
-      continue;
-    }
+    // 后台尝试API刷新
+    hotFetchWithTimeout('https://api.vvhan.com/api/hotlist?type=' + ({weibo:'wbHot',toutiao:'toutiao',zhihu:'zhihuHot',baidu:'baiduRD',douyin:'douyinHot',xiaohongshu:'xhsHot'}[platform]||''), 5000).then(async resp => {
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.success && json.data) {
+          const fresh = json.data.map((item, i) => ({
+            id: 'api_' + platform + '_' + i,
+            title: item.title || item.name || item.word || '',
+            heat: item.hot || item.index || '',
+            rank: i + 1, source: pLabel, time: ''
+          }));
+          if (fresh.length > 0) { _hotCache = fresh; hotCurrentList = fresh; hotRenderList(); }
+        }
+      }
+    }).catch(() => {});
+    return items;
   }
   return [];
 }
+let _hotSourceNote = '';
 
+// hotSearch: 支持 keyword 参数(程序调用) 或 无参(搜索按钮点击)
 async function hotSearch(keyword) {
+  // 无参调用 = 从搜索框取值触发
+  if (keyword === undefined) {
+    const input = document.getElementById('hotSearchInput');
+    if (!input || !input.value.trim()) { await hotLoadList(); return; }
+    const btn = document.getElementById('hotSearchBtn');
+    if (btn) btn.disabled = true;
+    const listEl = document.getElementById('hotList');
+    if (listEl) listEl.innerHTML = '<div class="hot-loading">搜索中…</div>';
+    hotCurrentList = await hotSearch(input.value.trim());
+    hotRenderList();
+    if (btn) btn.disabled = false;
+    return;
+  }
   if (!keyword || !keyword.trim()) return [];
   const kw = keyword.trim();
   let results = [];
-  // 优先用 vvhan 多源搜索，再兜底 tenapi
-  const searchSources = [
-    async () => {
-      const types = ['wbHot', 'toutiao', 'zhihuHot', 'baiduRD'];
-      const settled = await Promise.allSettled(
-        types.map(t => hotFetchWithTimeout('https://api.vvhan.com/api/hotlist?type=' + t, 8000))
-      );
-      let items = [];
-      for (const res of settled) {
-        if (res.status !== 'fulfilled' || !res.value.ok) continue;
-        try {
-          const json = await res.value.json();
-          if (json.success && json.data) {
-            for (const item of json.data) {
-              const title = item.title || item.name || item.word || '';
-              if (title.includes(kw)) {
-                items.push({
-                  id: 'hot_search_' + items.length,
-                  title: title,
-                  heat: item.hot || item.index || '',
-                  source: '',
-                  time: ''
-                });
-              }
-            }
-          }
-        } catch {}
+  // 直接搜内嵌种子数据
+  const platforms = ['weibo','toutiao','zhihu','baidu','douyin','xiaohongshu'];
+  const pLabels = { weibo:'微博', toutiao:'头条', zhihu:'知乎', baidu:'百度', douyin:'抖音', xiaohongshu:'小红书' };
+  for (const p of platforms) {
+    const seed = HOT_SEED[p];
+    if (!seed) continue;
+    for (const item of seed) {
+      if (item.title.indexOf(kw) !== -1) {
+        results.push({ id:'seed_s_'+results.length, title:item.title, heat:item.heat||'', rank:0, source:pLabels[p]||p, time:'' });
       }
-      return items;
-    },
-    async () => {
-      const [weiboRes, baiduRes] = await Promise.allSettled([
-        hotFetchWithTimeout('https://tenapi.cn/v2/weibohot', 8000),
-        hotFetchWithTimeout('https://tenapi.cn/v2/baiduhot', 8000)
-      ]);
-      let items = [];
-      for (const res of [weiboRes, baiduRes]) {
-        if (res.status !== 'fulfilled' || !res.value.ok) continue;
-        try {
-          const json = await res.value.json();
-          if (json.code === 200 && json.data) {
-            for (const item of json.data) {
-              const title = item.name || item.title || item.word || '';
-              if (title.includes(kw)) {
-                items.push({
-                  id: 'hot_search_' + items.length,
-                  title: title,
-                  heat: item.hotness || item.hot || '',
-                  source: '',
-                  time: ''
-                });
-              }
-            }
-          }
-        } catch {}
-      }
-      return items;
     }
-  ];
-  for (const src of searchSources) {
-    try {
-      const r = await src();
-      if (r && r.length > 0) { results = r; break; }
-    } catch { continue; }
   }
   return results.slice(0, 30);
 }
@@ -6050,19 +5983,22 @@ function hotRenderList() {
   const listEl = document.getElementById('hotList');
   if (!listEl) return;
   if (!hotCurrentList || hotCurrentList.length === 0) {
-    listEl.innerHTML = '<div class="hot-empty">暂无热点数据<br><span style="font-size:.68rem;">请切换平台重试，或检查网络连接</span></div>';
+    listEl.innerHTML = '<div class="hot-empty"><div style="font-size:2rem;margin-bottom:8px;">📡</div><p>暂无热点数据</p><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">请尝试切换上方其他平台查看</p></div>';
     return;
   }
   const selectedIds = new Set(hotContext.map(h => h.id));
-  listEl.innerHTML = hotCurrentList.map(item => {
-    const isSel = selectedIds.has(item.id);
-    return '<div class="hot-item' + (isSel ? ' selected' : '') + '" onclick="hotToggleItem(\'' + item.id + '\')">' +
-      '<input class="hot-check" type="checkbox" ' + (isSel ? 'checked' : '') + ' onclick="event.stopPropagation();hotToggleItem(\'' + item.id + '\')">' +
-      '<div class="hot-info"><div class="hot-title">' + escapeHtml(item.title) + '</div>' +
-      '<div class="hot-meta">' + (item.source ? '<span>' + item.source + '</span>' : '') + (item.time ? '<span>' + item.time + '</span>' : '') + '</div></div>' +
-      (item.heat ? '<span class="hot-heat">' + item.heat + '</span>' : '') +
-      '</div>';
-  }).join('');
+  listEl.innerHTML = (_hotSourceNote ? '<div style="padding:6px 0;font-size:.68rem;color:var(--text-muted);">' + _hotSourceNote + '</div>' : '') +
+    hotCurrentList.map(item => {
+      const rank = item.rank || 0;
+      const isSel = selectedIds.has(item.id);
+      return '<div class="hot-item' + (isSel ? ' selected' : '') + '" onclick="hotToggleItem(\'' + item.id + '\')">' +
+        '<div class="hot-rank">' + (rank > 0 && rank <= 3 ? '<span style="color:#fff;background:' + (rank===1?'#ef4444':rank===2?'#f97316':'#eab308') + ';padding:1px 6px;border-radius:3px;font-size:11px;font-weight:700;min-width:18px;text-align:center;">' + rank + '</span>' : '<span style="padding:1px 6px;font-size:11px;color:var(--text-muted);min-width:18px;text-align:center;">' + rank + '</span>') + '</div>' +
+        '<input class="hot-check" type="checkbox" ' + (isSel ? 'checked' : '') + ' onclick="event.stopPropagation();hotToggleItem(\'' + item.id + '\')">' +
+        '<div class="hot-info" style="flex:1;min-width:0;"><div class="hot-title">' + escHtml(item.title) + '</div>' +
+        '<div class="hot-meta">' + (item.source ? '<span>' + item.source + '</span>' : '') + '</div></div>' +
+        (item.heat ? '<span class="hot-heat">' + item.heat + '</span>' : '') +
+        '</div>';
+    }).join('');
 }
 
 function hotToggleItem(id) {
@@ -6096,19 +6032,66 @@ function hotRemoveChip(id) {
   hotRenderList();
 }
 
-async function hotSearch() {
-  const input = document.getElementById('hotSearchInput');
-  if (!input || !input.value.trim()) {
-    await hotLoadList();
-    return;
+async function hotRefreshData() {
+  const btn = document.querySelector('#tabHotradar button[onclick*="hotRefreshData"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 刷新中…'; }
+  const noteEl = document.getElementById('hotSourceNote');
+  if (noteEl) noteEl.textContent = '正在从云端拉取实时数据…';
+  
+  let gotLive = false;
+  // 尝试 Supabase
+  if (_supaAvailable && supabase) {
+    try {
+      const { data, error } = await supabase.rpc('get_hot_list', { p_platform: hotPlatform });
+      if (!error && data && data.length > 0) {
+        hotCurrentList = data.map((item, idx) => ({
+          id: 'supa_' + hotPlatform + '_' + item.id,
+          title: item.title, heat: item.heat || '',
+          rank: item.rank || (idx+1), source: ({weibo:'微博',toutiao:'头条',zhihu:'知乎',baidu:'百度',douyin:'抖音',xiaohongshu:'小红书'})[hotPlatform]||hotPlatform, time: ''
+        }));
+        gotLive = true;
+        if (noteEl) noteEl.textContent = '✅ 数据已从云端更新';
+      }
+    } catch(e) { console.warn('Supabase刷新失败:', e.message); }
   }
-  const btn = document.getElementById('hotSearchBtn');
-  if (btn) btn.disabled = true;
-  const listEl = document.getElementById('hotList');
-  if (listEl) listEl.innerHTML = '<div class="hot-loading">搜索中…</div>';
-  hotCurrentList = await hotSearch(input.value.trim());
+  // 尝试在线API
+  if (!gotLive) {
+    try {
+      const typeMap = { weibo:'wbHot', toutiao:'toutiao', zhihu:'zhihuHot', baidu:'baiduRD', douyin:'douyinHot', xiaohongshu:'xhsHot' };
+      const type = typeMap[hotPlatform];
+      if (type) {
+        const resp = await hotFetchWithTimeout('https://api.vvhan.com/api/hotlist?type=' + type, 8000);
+        if (resp && resp.ok) {
+          const json = await resp.json();
+          if (json.success && json.data && Array.isArray(json.data)) {
+            hotCurrentList = json.data.map((item, idx) => ({
+              id: 'api_' + hotPlatform + '_' + idx,
+              title: item.title || item.name || item.word || '',
+              heat: item.hot || item.index || '',
+              rank: idx + 1,
+              source: ({weibo:'微博',toutiao:'头条',zhihu:'知乎',baidu:'百度',douyin:'抖音',xiaohongshu:'小红书'})[hotPlatform]||hotPlatform, time: ''
+            }));
+            gotLive = true;
+            if (noteEl) noteEl.textContent = '✅ 数据已从实时接口更新';
+          }
+        }
+      }
+    } catch(e) { console.warn('API刷新失败:', e.message); }
+  }
+  if (!gotLive) {
+    if (noteEl) noteEl.textContent = '⚠️ 未能获取实时数据，显示本地数据';
+    const seed = HOT_SEED[hotPlatform];
+    if (seed) {
+      hotCurrentList = seed.map((item, idx) => ({
+        id: 'seed_' + hotPlatform + '_' + idx,
+        title: item.title, heat: item.heat || '',
+        rank: idx + 1,
+        source: ({weibo:'微博',toutiao:'头条',zhihu:'知乎',baidu:'百度',douyin:'抖音',xiaohongshu:'小红书'})[hotPlatform]||hotPlatform, time: ''
+      }));
+    }
+  }
   hotRenderList();
-  if (btn) btn.disabled = false;
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新'; }
 }
 
 function hotBuildContext() {
@@ -6600,3 +6583,35 @@ init();
 
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
