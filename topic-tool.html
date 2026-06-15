@@ -4,7 +4,7 @@
 <script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>林岛AI</title>
+<title>🚀 林岛AI</title>
 <style>
 /* ===== Theme Variables ===== */
 :root, [data-theme="dark"] {
@@ -454,6 +454,14 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   .main-content { padding-bottom: 80px; }
   /* 编辑按钮在卡片操作区也隐藏（保留复制/收藏/点赞核心操作） */
   .topic-actions > button:nth-child(7) { display:none; }
+  .ip-train-panel { width:100vw; height:100vh; max-height:100vh; border-radius:0; }
+  .ip-train-header { border-radius:0; }
+  .ip-train-footer { border-radius:0; }
+  .ip-train-questions { padding:12px 12px; }
+  .ip-train-header { padding:16px 16px 10px; }
+  .ip-train-cats { padding:8px 12px; }
+  .ip-train-footer { padding:10px 16px 16px; flex-wrap:wrap; }
+  .btn-train-skip-cat { display:none; }
 }
 @media (min-width:701px) {
   .sidebar-toggle { display: none; }
@@ -571,6 +579,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   .wj-inspire-left .wj-inspire-cat { flex-shrink:0; }
   .wj-fav-panel { width:98%; }
   .review-result { max-height:50vh; font-size:.74rem; }
+  .industry-modal { max-width: 90vw; padding: 20px 16px; }
+  .industry-modal h2 { font-size: 1.05rem; }
+  .industry-modal-btns { flex-direction: column; }
+  .industry-modal-btns .btn-confirm, .industry-modal-btns .btn-skip { width: 100%; text-align: center; }
 }
 
 /* 生成进度条 */
@@ -815,13 +827,344 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   /* 按钮和输入框字号 >= 14px（移动端触摸友好） */
   button, input:not([type="range"]), select, textarea { font-size: 14px; }
 }
-</style>
-</head>
-<body data-theme="dark">
 
+/* IP训练问答弹窗 */
+.ip-train-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); z-index:10000; display:flex; align-items:center; justify-content:center; }
+.ip-train-panel { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; width:min(680px,95vw); max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+.ip-train-header { display:flex; justify-content:space-between; align-items:flex-start; padding:20px 24px 12px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg-card); z-index:1; border-radius:16px 16px 0 0; }
+.ip-train-header h2 { font-size:1.15rem; color:var(--text); margin:0 0 4px; }
+.train-cat-desc { font-size:.72rem; color:var(--text-muted); }
+.ip-train-close { background:none; border:none; font-size:1.2rem; color:var(--text-muted); cursor:pointer; padding:4px 8px; border-radius:6px; transition:all .2s; }
+.ip-train-close:hover { background:var(--bg); color:var(--text); }
+.ip-train-cats { display:flex; gap:6px; padding:10px 24px; overflow-x:auto; flex-shrink:0; scrollbar-width:none; }
+.ip-train-cats::-webkit-scrollbar { display:none; }
+.ip-train-cat { padding:4px 12px; border-radius:20px; font-size:.68rem; white-space:nowrap; cursor:pointer; border:1px solid var(--border); color:var(--text-muted); background:var(--bg); transition:all .2s; }
+.ip-train-cat.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.ip-train-cat.done { border-color:var(--success); color:var(--success); }
+.ip-train-progress-bar { height:4px; background:var(--bg); margin:0 24px; border-radius:2px; overflow:hidden; }
+.ip-train-progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+.ip-train-progress-text { text-align:center; font-size:.68rem; color:var(--text-muted); padding:4px 0 8px; }
+.ip-train-questions { padding:12px 24px; flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+.ip-train-q-card { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.ip-train-q-num { font-size:.65rem; color:var(--accent); font-weight:700; margin-bottom:4px; }
+.ip-train-q-text { font-size:.86rem; color:var(--text); line-height:1.5; margin-bottom:10px; }
+.ip-train-q-input { width:100%; padding:8px 12px; border:1px solid var(--border); border-radius:8px; font-size:.82rem; background:var(--bg-card); color:var(--text); resize:vertical; min-height:60px; font-family:inherit; }
+.ip-train-q-input:focus { outline:none; border-color:var(--accent); }
+.ip-train-q-quick { display:flex; flex-wrap:wrap; gap:6px; }
+.ip-train-q-chip { padding:4px 14px; border-radius:20px; font-size:.72rem; cursor:pointer; border:1px solid var(--border); color:var(--text-muted); background:var(--bg-card); transition:all .15s; white-space:nowrap; }
+.ip-train-q-chip:hover { border-color:var(--accent); color:var(--accent); }
+.ip-train-q-chip.selected { background:var(--accent); color:#fff; border-color:var(--accent); }
+.ip-train-footer { display:flex; gap:8px; padding:12px 24px 20px; justify-content:flex-end; border-top:1px solid var(--border); position:sticky; bottom:0; background:var(--bg-card); border-radius:0 0 16px 16px; }
+.btn-train-skip, .btn-train-skip-cat { background:transparent; border:1px solid var(--border); color:var(--text-muted); padding:8px 16px; border-radius:8px; font-size:.76rem; cursor:pointer; transition:all .2s; }
+.btn-train-skip:hover, .btn-train-skip-cat:hover { background:var(--bg); }
+.btn-train-next { background:var(--accent); border:none; color:#fff; padding:8px 24px; border-radius:8px; font-size:.8rem; cursor:pointer; transition:all .2s; font-weight:600; }
+.btn-train-next:hover { opacity:.9; transform:translateY(-1px); }
+.btn-train-next:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+
+/* ===== 左下角按钮组 ===== */
+.bottom-left-group {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bottom-left-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--accent);
+  color: var(--bg-card);
+  border: none;
+  border-radius: 24px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 4px 16px rgba(102,126,234,0.35);
+  letter-spacing: 1px;
+}
+.bottom-left-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(102,126,234,0.5);
+}
+.bottom-left-btn:active {
+  transform: translateY(0);
+}
+
+/* ===== 登录遮罩 ===== */
+.login-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.25s ease;
+}
+.login-overlay.show {
+  display: flex;
+}
+/* ==== 登录拦截：主应用默认隐藏，登录后显示 ==== */
+#appMain {
+  display: none;
+}
+#appMain.logged-in {
+  display: block;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.login-card {
+  width: 420px;
+  max-width: 92vw;
+  padding: 48px 40px 40px;
+  background: rgba(30,30,50,0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 24px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  animation: cardIn 0.4s cubic-bezier(0.22,0.61,0.36,1);
+  position: relative;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-avatar {
+  width: 56px; height: 56px;
+  margin: 0 auto 24px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(102,126,234,0.4);
+}
+.login-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #f0f0f0;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+}
+.login-subtitle {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 32px;
+}
+
+.login-input-group {
+  position: relative;
+  margin-bottom: 20px;
+}
+.login-input-group .login-input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px; height: 20px;
+  fill: none;
+  stroke: rgba(255,255,255,0.4);
+  transition: stroke 0.3s;
+  pointer-events: none;
+}
+.login-input-group input {
+  width: 100%;
+  padding: 14px 16px 14px 48px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  font-size: 15px;
+  color: #f0f0f0;
+  outline: none;
+  transition: all 0.3s;
+  letter-spacing: 0.5px;
+}
+.login-input-group input::placeholder {
+  color: rgba(255,255,255,0.3);
+}
+.login-input-group input:focus {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(102,126,234,0.6);
+  box-shadow: 0 0 0 4px rgba(102,126,234,0.12);
+}
+
+.login-toggle-pw {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+.login-toggle-pw svg {
+  width: 20px; height: 20px;
+  stroke: rgba(255,255,255,0.4);
+  transition: stroke 0.3s;
+}
+.login-toggle-pw:hover svg { stroke: rgba(255,255,255,0.7); }
+
+.login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  user-select: none;
+}
+.login-remember input[type="checkbox"] { display: none; }
+.login-remember .login-checkmark {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+}
+.login-remember input:checked + .login-checkmark {
+  background: #667eea;
+  border-color: #667eea;
+  box-shadow: 0 0 12px rgba(102,126,234,0.5);
+}
+.login-remember input:checked + .login-checkmark::after {
+  content: '';
+  width: 6px; height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translateY(-1px);
+}
+.login-forgot {
+  color: rgba(255,255,255,0.45);
+  text-decoration: none;
+  transition: color 0.3s;
+  cursor: pointer;
+}
+.login-forgot:hover { color: #667eea; }
+
+.btn-login {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.btn-login:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(102,126,234,0.45);
+}
+.btn-login:active {
+  transform: translateY(0);
+}
+.btn-login.loading {
+  pointer-events: none;
+  color: transparent;
+}
+.btn-login.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 24px; height: 24px;
+  border: 2.5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: loginSpin 0.7s linear infinite;
+}
+@keyframes loginSpin {
+  to { transform: translate(-50%,-50%) rotate(360deg); }
+}
+
+.login-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.45);
+  font-size: 24px;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+.login-close:hover { color: #fff; }
+
+/* 登录 Toast */
+.login-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 1100;
+  animation: toastIn 0.35s ease, toastOut 0.35s ease 2.5s forwards;
+  pointer-events: none;
+}
+.login-toast.success { background: rgba(34,197,94,0.9); box-shadow: 0 8px 24px rgba(34,197,94,0.3); }
+.login-toast.error { background: rgba(239,68,68,0.9); box-shadow: 0 8px 24px rgba(239,68,68,0.3); }
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(-16px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity:1; } to { opacity:0; transform:translateX(-50%) translateY(-16px); } }
+
+@media (max-width:480px) {
+  .bottom-left-group {
+    bottom: 16px;
+    left: 12px;
+    gap: 8px;
+  }
+  .bottom-left-btn {
+    padding: 8px 16px;
+    font-size: 0.78rem;
+  }
+  .login-card {
+    padding: 36px 24px 32px;
+    border-radius: 20px;
+  }
+  .login-title { font-size: 21px; }
+  .login-input-group input { padding: 12px 16px 12px 42px; font-size: 14px; }
+  .btn-login { padding: 13px; font-size: 15px; }
+}
 </style>
 </head>
 <body data-theme="dark">
+<div id="appMain">
 
 <div class="gen-progress-container" id="genProgress" style="display:none;"><div class="gen-progress-fill" id="genProgressFill"></div></div>
 
@@ -829,28 +1172,79 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- 手机端固定导航条 -->
 <div class="mobile-topbar">
   <button class="hamburger" onclick="toggleSidebar()" aria-label="菜单">☰</button>
-  <span class="topbar-title" id="mobileTopbarTitle">林岛AI</span>
+  <span class="topbar-title" id="mobileTopbarTitle">🚀 林岛AI</span>
 </div>
 <!-- 抽屉遮罩 -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
 <aside class="sidebar">
-  <div class="sidebar-brand">🚀 <span class="accent" id="appTitle">林岛AI</span><button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开侧边栏">☰</button>
+  <div class="sidebar-brand"><span class="accent" id="appTitle">🚀 林岛AI</span><button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开侧边栏">&#x2630;</button>
 
   </div>
   <nav class="sidebar-nav">
-    <button class="sidebar-btn active" data-tab="workbench" onclick="switchTab('workbench')">📋 选题工作台</button>
-    <button class="sidebar-btn" data-tab="results" onclick="switchTab('results')">📰 选题结果<span class="sidebar-badge" id="badgeResults"></span></button>
-    <button class="sidebar-btn" data-tab="favorites" onclick="switchTab('favorites')">❤️ 收藏夹<span class="sidebar-badge" id="badgeFavorites"></span></button>
-    <button class="sidebar-btn" data-tab="inspire" onclick="switchTab('inspire')">💡 灵感库</button>
-    <button class="sidebar-btn" data-tab="review" onclick="switchTab('review')">📝 文案审核</button>
-    <button class="sidebar-btn" data-tab="script" onclick="switchTab('script')">✍️ 文案生成</button>
-    <button class="sidebar-btn" data-tab="industry" onclick="switchTab('industry')">🏭 行业训练</button>
-    <button class="sidebar-btn" data-tab="history" onclick="switchTab('history')">📜 历史选题<span class="sidebar-badge" id="badgeHistory"></span></button>
-    <button class="sidebar-btn" data-tab="hotradar" onclick="switchTab('hotradar')">🔥 热点雷达</button>
-    <button class="sidebar-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ 设置</button>
+    <button class="sidebar-btn active" data-tab="workbench" onclick="switchTab('workbench')">&#x1F4CB; 选题工作台</button>
+    <button class="sidebar-btn" data-tab="results" onclick="switchTab('results')">&#x1F4F0; 选题结果<span class="sidebar-badge" id="badgeResults"></span></button>
+    <button class="sidebar-btn" data-tab="favorites" onclick="switchTab('favorites')">&#x2764;&#xFE0F; 收藏夹<span class="sidebar-badge" id="badgeFavorites"></span></button>
+    <button class="sidebar-btn" data-tab="inspire" onclick="switchTab('inspire')">&#x1F4A1; 灵感库</button>
+    <button class="sidebar-btn" data-tab="review" onclick="switchTab('review')">&#x1F4DD; 文案审核</button>
+    <button class="sidebar-btn" data-tab="script" onclick="switchTab('script')">&#x270D;&#xFE0F; 文案生成</button>
+    <button class="sidebar-btn" data-tab="industry" onclick="switchTab('industry')">&#x1F3ED; 行业训练</button>
+    <button class="sidebar-btn" data-tab="history" onclick="switchTab('history')">&#x1F4DC; 历史选题<span class="sidebar-badge" id="badgeHistory"></span></button>
+    <button class="sidebar-btn" data-tab="hotradar" onclick="switchTab('hotradar')">&#x1F525; 热点雷达</button>
   </nav>
 </aside>
+
+<!-- 左下角按钮组 -->
+<div class="bottom-left-group">
+  <button class="bottom-left-btn" onclick="switchTab('settings')" title="设置">&#x2699;&#xFE0F; 设置</button>
+  <button class="bottom-left-btn login-trigger" onclick="handleLogout()" title="退出登录">&#x1F512; 退出</button>
+</div>
+
+</div><!-- /appMain -->
+
+<!-- 登录遮罩层 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-avatar">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="login-title">欢迎回来</div>
+    <div class="login-subtitle">请输入您的账号信息以继续</div>
+
+    <form id="loginForm" autocomplete="off" novalidate>
+      <div class="login-input-group">
+        <svg class="login-input-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/><path d="M20 21v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1"/>
+        </svg>
+        <input type="text" id="loginUsername" placeholder="请输入邮箱" required>
+      </div>
+      <div class="login-input-group">
+        <svg class="login-input-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <input type="password" id="loginPassword" placeholder="请输入密码" required>
+        <button type="button" class="login-toggle-pw" id="loginTogglePw" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="3" stroke-width="2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="login-options">
+        <label class="login-remember">
+          <input type="checkbox" id="loginRememberMe">
+          <span class="login-checkmark"></span>
+          记住我
+        </label>
+        <a class="login-forgot" id="loginForgotLink">忘记密码？</a>
+      </div>
+      <button type="submit" class="btn-login" id="btnLoginSubmit">登 录</button>
+    </form>
+  </div>
+</div>
+
 <audio id="wjAudioPlayer" style="display:none;"></audio>
 
 <div class="main-content">
@@ -860,13 +1254,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
   <!-- 爆款元素 -->
   <div class="panel">
-    <div class="panel-title">🔥 爆款元素</div>
+    <div class="panel-title">&#x1F4A5; 爆款元素</div>
     <div class="panel-desc">选中想要的爆款元素，点击卡片切换。选题会根据选中元素生成。</div>
     <div class="elem-grid" id="elemGrid"></div>
     <div class="elem-actions">
       <button onclick="selectAllElems()">全选</button>
       <button onclick="clearAllElems()">清空</button>
-      <button onclick="randomPick3()">🎲 随机选3个</button>
+      <button onclick="randomPick3()">&#x1F3B2; 随机选3个</button>
     </div>
   </div>
 
@@ -879,7 +1273,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
   <!-- 话题类别 -->
   <div class="panel">
-    <div class="panel-title">🏷️ 话题类别</div>
+    <div class="panel-title">&#x1F3F7;&#xFE0F; 话题类别</div>
     <div class="panel-desc">勾选想要生成的类别（可多选），未选类别不会参与。</div>
     <div class="cat-grid" id="catGrid"></div>
     <div class="cat-add-row">
@@ -893,10 +1287,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
   <!-- 灵感选择 -->
   <div class="panel">
-    <div class="panel-title">💡 引用灵感素材（可选）</div>
+    <div class="panel-title">&#x1F4A1; 引用灵感素材（可选）</div>
     <div class="panel-desc">从灵感库中选素材让AI参考生成。不选则按默认模式生成。最多选3条。</div>
     <div class="wj-inspire-trigger" style="display:inline-block;position:relative;">
-      <button onclick="wjToggleWorkbenchInspireDropdown(event)" style="padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);font-size:.74rem;cursor:pointer;transition:.2s;">📁 选择灵感素材<div class="wj-inspire-chips" id="wjWorkbenchInspireChips" style="display:inline;"></div></button>
+      <button onclick="wjToggleWorkbenchInspireDropdown(event)" style="padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);font-size:.74rem;cursor:pointer;transition:.2s;">💡 选择灵感素材<div class="wj-inspire-chips" id="wjWorkbenchInspireChips" style="display:inline;"></div></button>
       <div class="wj-inspire-dropdown" id="wjWorkbenchInspireDropdown"></div>
     </div>
   </div>
@@ -909,8 +1303,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
   <!-- 生成按钮 -->
   <div class="gen-btns">
-    <button class="btn-generate" onclick="generateAndGo()">🚀 生成选题</button>
-    <button class="btn-random" onclick="randomAndGo()">🎲 随机来一批</button>
+    <button class="btn-generate" onclick="generateAndGo()">&#x1F680; 生成选题</button>
+    <button class="btn-random" onclick="randomAndGo()">&#x1F3B2; 随机来一批</button>
   </div>
 </div>
 
@@ -924,15 +1318,15 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   </div>
 
   <div class="result-actions">    <div class="wj-inspire-trigger" style="display:inline-block;position:relative;">
-    <button onclick="wjToggleInspireDropdown(event)" style="padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);font-size:.74rem;cursor:pointer;transition:.2s;">🔗 引用灵感<div class="wj-inspire-chips" id="wjInspireChips" style="display:inline;"></div></button>
+    <button onclick="wjToggleInspireDropdown(event)" style="padding:7px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-secondary);font-size:.74rem;cursor:pointer;transition:.2s;">💡 引用灵感<div class="wj-inspire-chips" id="wjInspireChips" style="display:inline;"></div></button>
     <div class="wj-inspire-dropdown" id="wjInspireDropdown"></div>
   </div>
 
-    <button id="regenBtn" class="btn-regen" onclick="regenerateAll()">🔄 重新生成</button>
-    <button onclick="exportTopics()">💾 导出全部</button>
-    <button onclick="wjOpenFavorites()">❤️ 收藏夹 (<span id="favCount">0</span>)</button>
-    <button class="btn-clear" onclick="clearCurrentTopics()">🗑 清空当前</button>
-    <button id="btnTrainMode" onclick="toggleTrainMode()" style="background:var(--purple);color:#fff;border:none;">🤖 训练 AI</button>
+    <button id="regenBtn" class="btn-regen" onclick="regenerateAll()">&#x1F504; 重新生成</button>
+    <button onclick="exportTopics()">&#x1F4E5; 导出全部</button>
+    <button onclick="wjOpenFavorites()">&#x2764;&#xFE0F; 收藏夹 (<span id="favCount">0</span>)</button>
+    <button class="btn-clear" onclick="clearCurrentTopics()">&#x1F5D1;&#xFE0F; 清空当前</button>
+    <button id="btnTrainMode" onclick="toggleTrainMode()" style="background:var(--purple);color:#fff;border:none;">🧠 训练 AI</button>
   </div>
 
   <!-- 批量训练控制条 -->
@@ -944,13 +1338,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
   <div class="topic-grid" id="topicGrid">
     <div class="empty-state">
-      <div class="empty-icon">🔍</div>
+      <div class="empty-icon">&#x1F4CB;</div>
       <p>还没有生成选题<br>回到工作台选好元素和类别，点击生成吧</p>
     </div>
   </div>
 
   <div class="redline-section" id="redlineSection" style="display:none;">
-    <div class="redline-title" onclick="this.parentElement.classList.toggle('open')">🚫 红线过滤日志 <span id="redlineCount"></span><span class="arrow"> ▶</span></div>
+    <div class="redline-title" onclick="this.parentElement.classList.toggle('open')">🚫 红线过滤日志 <span id="redlineCount"></span><span class="arrow"> ▼</span></div>
     <div class="redline-body" id="redlineBody"></div>
   </div>
 
@@ -958,7 +1352,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 </div>
 
 <!-- ==================== 标签：历史选题 ==================== -->
-<!-- 🔥 热点雷达 -->
+<!-- &#x1F525; 热点雷达 -->
     <div id="tabHotradar" class="tab-content">
       <div class="hot-chips-bar" id="hotChipsBar"><span style="font-size:.72rem;color:var(--text-muted);">未选择热点（勾选下方热点以注入AI上下文）</span></div>
       <div class="hot-search-bar">
@@ -981,9 +1375,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <div id="tabHistory" class="tab-content">
   <div class="history-toolbar">
     <div class="history-actions">
-      <button class="btn-muted" onclick="toggleSelectAllHistory()" id="btnHistorySelectAll">☑ 全选</button>
-      <button class="btn-danger-outline" onclick="deleteSelectedHistory()" id="btnHistoryDeleteSel" disabled>🗑 删除选中</button>
-      <button class="btn-danger" onclick="clearAllHistory()">🧹 全部清除</button>
+      <button class="btn-muted" onclick="toggleSelectAllHistory()" id="btnHistorySelectAll">☐ 全选</button>
+      <button class="btn-danger-outline" onclick="deleteSelectedHistory()" id="btnHistoryDeleteSel" disabled>🗑️ 删除选中</button>
+      <button class="btn-danger" onclick="clearAllHistory()">🗑️ 全部清除</button>
     </div>
     <div class="history-search">
       <input type="text" id="historySearchInput" placeholder="搜索标题/元素/类别…" oninput="onHistorySearch()">
@@ -991,7 +1385,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   </div>
   <div class="history-list" id="historyList">
     <div class="empty-state">
-      <div class="empty-icon">📭</div>
+      <div class="empty-icon">&#x1F4CB;</div>
       <p>暂无历史选题<br>回到工作台生成选题后会自动保存</p>
     </div>
   </div>
@@ -1017,8 +1411,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <!-- AI 设置 -->
     <div class="setting-cat open" id="settingCat_ai">
       <div class="setting-cat-header" onclick="toggleSettingCat('ai')">
-        <span class="cat-chevron">▶</span>
-        <span class="cat-icon">🤖</span>
+        <span class="cat-chevron">▼</span>
+        <span class="cat-icon">📂</span>
         <span class="cat-label">AI 设置</span>
         <span class="cat-badge">接口 · 模型</span>
       </div>
@@ -1037,28 +1431,28 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
           <label>启用 AI</label>
           <label><input type="checkbox" id="apiEnabled" onchange="saveApiConfig()"></label>
         </div>
-        <button class="btn-secondary" onclick="testApiConnection()" style="margin-top:4px;">🔗 测试连接</button>
+        <button class="btn-secondary" onclick="testApiConnection()" style="margin-top:4px;">🔌 测试连接</button>
         <div id="apiStatus" style="font-size:.74rem;margin-top:6px;"></div>
 
         <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">
           <label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:8px;">每功能模型</label>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">🎯 选题生成</span>
+            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">📝 选题生成</span>
             <select id="apiModel_topic" onchange="onFeatureModelChange('topic')" style="flex:1;min-width:0;"></select>
             <input type="text" id="apiModelCustom_topic" placeholder="手动输入…" style="display:none;flex:1;min-width:0;" onchange="saveApiConfig()">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">📋 文案审核</span>
+            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">&#x1F4DD; 文案审核</span>
             <select id="apiModel_review" onchange="onFeatureModelChange('review')" style="flex:1;min-width:0;"></select>
             <input type="text" id="apiModelCustom_review" placeholder="手动输入…" style="display:none;flex:1;min-width:0;" onchange="saveApiConfig()">
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">✍️ 文案生成</span>
+            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">&#x270D;&#xFE0F; 文案生成</span>
             <select id="apiModel_script" onchange="onFeatureModelChange('script')" style="flex:1;min-width:0;"></select>
             <input type="text" id="apiModelCustom_script" placeholder="手动输入…" style="display:none;flex:1;min-width:0;" onchange="saveApiConfig()">
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">🏭 行业训练</span>
+            <span style="font-size:.78rem;min-width:66px;flex-shrink:0;">&#x1F3ED; 行业训练</span>
             <select id="apiModel_train" onchange="onFeatureModelChange('train')" style="flex:1;min-width:0;"></select>
             <input type="text" id="apiModelCustom_train" placeholder="手动输入…" style="display:none;flex:1;min-width:0;" onchange="saveApiConfig()">
           </div>
@@ -1069,8 +1463,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <!-- 权重设置 -->
     <div class="setting-cat" id="settingCat_weight">
       <div class="setting-cat-header" onclick="toggleSettingCat('weight')">
-        <span class="cat-chevron">▶</span>
-        <span class="cat-icon">⚖️</span>
+        <span class="cat-chevron">▼</span>
+        <span class="cat-icon">📂</span>
         <span class="cat-label">权重设置</span>
         <span class="cat-badge">类别 · 元素 · 关键词</span>
       </div>
@@ -1091,8 +1485,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <!-- 选题黑名单 -->
     <div class="setting-cat" id="settingCat_block">
       <div class="setting-cat-header" onclick="toggleSettingCat('block')">
-        <span class="cat-chevron">▶</span>
-        <span class="cat-icon">🚫</span>
+        <span class="cat-chevron">▼</span>
+        <span class="cat-icon">📂</span>
         <span class="cat-label">选题黑名单</span>
         <span class="cat-badge" id="settingBlockBadge"></span>
       </div>
@@ -1100,7 +1494,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
         <div class="panel-desc" style="margin-bottom:10px;">已永久屏蔽的关键词和预设选题，后续生成时自动跳过。</div>
         <div id="blockedKeywordsList" style="margin-bottom:8px;"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn-danger" onclick="clearAllBlocked()" style="font-size:.74rem;">🗑 清空全部黑名单</button>
+          <button class="btn-danger" onclick="clearAllBlocked()" style="font-size:.74rem;">🗑️ 清空全部黑名单</button>
         </div>
       </div>
     </div>
@@ -1108,8 +1502,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <!-- 上下文 -->
     <div class="setting-cat" id="settingCat_context">
       <div class="setting-cat-header" onclick="toggleSettingCat('context')">
-        <span class="cat-chevron">▶</span>
-        <span class="cat-icon">📝</span>
+        <span class="cat-chevron">▼</span>
+        <span class="cat-icon">📂</span>
         <span class="cat-label">自定义上下文</span>
         <span class="cat-badge">Prompt 模板</span>
       </div>
@@ -1127,7 +1521,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
         <div class="wj-context-section">
           <div class="wj-context-header">
-            <span style="font-weight:600;">🎯 选题生成上下文</span>
+            <span style="font-weight:600;">📝 选题生成上下文</span>
             <span style="font-size:.68rem;color:#888;">作用于：AI 生成选题</span>
           </div>
           <textarea id="wjContextTopic" class="wj-context-input" rows="6" placeholder="【红线禁令】..."></textarea>
@@ -1136,7 +1530,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
         <div class="wj-context-section">
           <div class="wj-context-header">
-            <span style="font-weight:600;">📋 文案审核上下文</span>
+            <span style="font-weight:600;">&#x1F4DD; 文案审核上下文</span>
             <span style="font-size:.68rem;color:#888;">作用于：AI 审核文案</span>
           </div>
           <textarea id="wjContextReview" class="wj-context-input" rows="8" placeholder="你是深耕抖音生态的资深内容运营专家..."></textarea>
@@ -1145,7 +1539,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 
         <div class="wj-context-section">
           <div class="wj-context-header">
-            <span style="font-weight:600;">✍️ 文案生成上下文</span>
+            <span style="font-weight:600;">&#x270D;&#xFE0F; 文案生成上下文</span>
             <span style="font-size:.68rem;color:#888;">作用于：选题展开生成口播文案</span>
           </div>
           <textarea id="wjContextScript" class="wj-context-input" rows="8" placeholder="你是一个抖音{industry}账号的文案助手..."></textarea>
@@ -1163,8 +1557,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <!-- 音乐库 -->
     <div class="setting-cat" id="settingCat_music">
       <div class="setting-cat-header" onclick="toggleSettingCat('music')">
-        <span class="cat-chevron">▶</span>
-        <span class="cat-icon">🎵</span>
+        <span class="cat-chevron">▼</span>
+        <span class="cat-icon">📂</span>
         <span class="cat-label">音乐库</span>
         <span class="cat-badge">背景音乐</span>
       </div>
@@ -1178,7 +1572,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
           </div>
           <div class="wj-music-entry-form">
             <span style="position:relative;overflow:hidden;display:inline-block;vertical-align:middle;">
-              <button style="background:var(--info);border:none;cursor:default;padding:4px 14px;border-radius:6px;color:#fff;font-size:.78rem;pointer-events:none;">📁 上传本地音乐</button>
+              <button style="background:var(--info);border:none;cursor:default;padding:4px 14px;border-radius:6px;color:#fff;font-size:.78rem;pointer-events:none;">🎵 上传本地音乐</button>
               <input type="file" accept="audio/*" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;" onchange="wjUploadMusicFile(this)">
             </span>
             <span style="font-size:.68rem;color:var(--text-muted);">支持 mp3 / wav / ogg</span>
@@ -1188,17 +1582,17 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
       </div>
     </div>
 
-    <!-- 💾 数据管理 -->
+    <!-- 📦 数据管理 -->
     <div class="setting-group collapsed" id="settingCat_dataMgmt">
       <div class="setting-group-header" onclick="toggleSettingCat('dataMgmt')">
-        <span>💾 数据管理</span><span class="toggle-icon">▼</span>
+        <span>📦 数据管理</span><span class="toggle-icon">▼</span>
       </div>
       <div class="setting-group-body">
         <div class="panel-desc" style="margin-bottom:8px;">导出/导入/清空全部本地数据，防止升级丢数据。</div>
         <div class="data-mgmt-row">
-          <button class="btn-export" onclick="exportAllData()">📤 导出全部数据</button>
+          <button class="btn-export" onclick="exportAllData()">&#x1F4E5; 导出全部数据</button>
           <button class="btn-import" onclick="triggerImportData()">📥 导入数据</button>
-          <button class="btn-clear" onclick="confirmClearAllData()">🗑 清空全部数据</button>
+          <button class="btn-clear" onclick="confirmClearAllData()">🗑️ 清空全部数据</button>
           <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="handleImportFile(event)">
         </div>
         <div class="data-preview" id="dataPreview"></div>
@@ -1211,7 +1605,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
       <h3>⚠️ 危险操作</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-danger" onclick="confirmResetPrefs()">🔄 重置所有偏好数据</button>
-        <button class="btn-danger" onclick="confirmClearFavorites()">🗑 清空收藏夹</button>
+        <button class="btn-danger" onclick="confirmClearFavorites()">🗑️ 清空收藏夹</button>
       </div>
     </div>
 
@@ -1233,7 +1627,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     <h3>⭐ 收藏夹</h3>
     <div class="fav-list" id="favList"></div>
     <div class="modal-btns">
-      <button class="fav-clear" onclick="clearFavorites()">🗑 清空收藏夹</button>
+      <button class="fav-clear" onclick="clearFavorites()">🗑️ 清空收藏夹</button>
       <button class="btn-secondary" onclick="closeFavorites()">关闭</button>
     </div>
   </div>
@@ -1242,12 +1636,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- ==================== 标签4：灵感库 ==================== -->
 <div id="tabInspire" class="tab-content">
   <div class="panel">
-    <div class="panel-title">💡 灵感库</div>
+    <div class="panel-title">&#x1F4A1; 灵感库</div>
     <div class="panel-desc">记录生活中的选题灵感，生成时可引用。</div>
     <div class="wj-inspire" id="wjInspire">
       <div class="wj-inspire-left" id="wjInspireCats"></div>
       <div class="wj-inspire-right" id="wjInspireContent">
-        <div class="wj-inspire-empty">👈 选择一个分类查看素材</div>
+        <div class="wj-inspire-empty">📂 选择一个分类查看素材</div>
       </div>
     </div>
   </div>
@@ -1257,11 +1651,11 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <div class="wj-fav-overlay" id="wjFavOverlay" style="display:none;">
   <div class="wj-fav-panel">
     <div class="wj-fav-header">
-      <h3>❤️ 收藏夹</h3>
+      <h3>&#x2764;&#xFE0F; 收藏夹</h3>
       <span class="wj-fav-stats" id="wjFavStats"></span>
       <div style="display:flex;gap:6px;">
-        <button class="wj-fav-export" onclick="wjExportFavorites()">💾 导出收藏</button>
-        <button class="wj-fav-clearall" onclick="wjClearAllFavorites()">🗑 全部取消</button>
+        <button class="wj-fav-export" onclick="wjExportFavorites()">📤 导出收藏</button>
+        <button class="wj-fav-clearall" onclick="wjClearAllFavorites()">❌ 全部取消</button>
         <button onclick="wjCloseFavorites()" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);cursor:pointer;font-size:.74rem;">✕ 关闭</button>
       </div>
     </div>
@@ -1272,11 +1666,11 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- ==================== 标签：收藏夹 ==================== -->
 <div id="tabFavorites" class="tab-content">
   <div class="panel">
-    <div class="panel-title">❤️ 收藏夹</div>
+    <div class="panel-title">&#x2764;&#xFE0F; 收藏夹</div>
     <div class="panel-desc">你收藏的选题。可在此取消收藏、复制标题、导出或清空。</div>
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="wj-fav-export" onclick="wjExportFavorites()">💾 导出收藏</button>
-      <button class="wj-fav-clearall" onclick="wjClearAllFavorites()">🗑 全部清空</button>
+      <button class="wj-fav-export" onclick="wjExportFavorites()">📤 导出收藏</button>
+      <button class="wj-fav-clearall" onclick="wjClearAllFavorites()">🗑️ 全部清空</button>
       <span class="wj-fav-stats" id="wjFavStatsTab" style="margin-left:auto;"></span>
     </div>
     <div id="tabFavContent"></div>
@@ -1286,12 +1680,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- ==================== 标签5：文案审核 ==================== -->
 <div id="tabReview" class="tab-content">
   <div class="panel">
-    <div class="panel-title">📝 文案审核</div>
+    <div class="panel-title">&#x1F4DD; 文案审核</div>
     <div class="panel-desc">将抖音口播文案粘贴到下方，AI 将从结构、爆款元素、钩子、口语化、去AI化、合规性六个维度进行专业审核。</div>
     <textarea id="reviewInput" class="review-textarea" placeholder="在此粘贴需要审核的抖音口播文案…"></textarea>
     <div class="review-actions">
-      <button class="btn-generate" onclick="reviewScript()" id="btnReview">🔍 审核文案</button>
-      <button class="btn-random" onclick="clearReview()">🗑 清空</button>
+      <button class="btn-generate" onclick="reviewScript()" id="btnReview">📋 审核文案</button>
+      <button class="btn-random" onclick="clearReview()">🗑️ 清空</button>
       <span class="review-status" id="reviewStatus"></span>
     </div>
     <div class="review-progress" id="reviewProgress" style="display:none;">
@@ -1299,7 +1693,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     </div>
     <div class="review-result" id="reviewResult" style="display:none;"></div>
     <div class="review-global-fb" id="reviewGlobalFB" style="display:none;">
-      <div class="gf-title">📝 整体审核意见反馈</div>
+      <div class="gf-title">📊 整体审核意见反馈</div>
       <textarea id="reviewGlobalFBInput" placeholder="对本次审核的整体评价：哪些判断准确、哪些不合理、有什么期望的审核风格…"></textarea>
       <div class="gf-btns">
         <button onclick="submitReviewGlobalFeedback()">提交反馈</button>
@@ -1307,7 +1701,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
       <div class="gf-status" id="reviewGFBStatus"></div>
     </div>
     <div class="review-train-history" id="reviewTrainHistory">
-      <div class="th-title" onclick="toggleReviewTrainHistory()">📋 历史纠偏记录 <span class="arrow">▶</span></div>
+      <div class="th-title" onclick="toggleReviewTrainHistory()">📋 历史纠偏记录 <span class="arrow">▼</span></div>
       <div class="th-body" id="reviewTrainHistoryBody"></div>
     </div>
   </div>
@@ -1316,12 +1710,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- ==================== 标签：文案生成 ==================== -->
 <div id="tabScript" class="tab-content">
   <div class="panel">
-    <div class="panel-title">✍️ 文案生成</div>
+    <div class="panel-title">&#x270D;&#xFE0F; 文案生成</div>
     <div class="panel-desc">输入任意内容（选题标题、关键词、灵感片段、参考文案…），AI 将基于你设定的文案生成上下文，为你生成完整的抖音口播文案。</div>
     <textarea id="scriptGenInput" class="review-textarea" placeholder="在此输入任意内容，AI 会据此生成文案…"></textarea>
     <div class="review-actions">
-      <button class="btn-generate" onclick="generateScriptStandalone()" id="btnScriptGen">🚀 生成文案</button>
-      <button class="btn-random" onclick="clearScriptGen()">🗑 清空</button>
+      <button class="btn-generate" onclick="generateScriptStandalone()" id="btnScriptGen">✍️ 生成文案</button>
+      <button class="btn-random" onclick="clearScriptGen()">🗑️ 清空</button>
       <span class="review-status" id="scriptGenStatus"></span>
     </div>
     <div class="review-progress" id="scriptGenProgress" style="display:none;">
@@ -1334,7 +1728,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
 <!-- ==================== 标签：行业训练 ==================== -->
 <div id="tabIndustry" class="tab-content">
   <div class="panel">
-    <div class="panel-title">🏭 行业训练</div>
+    <div class="panel-title">&#x1F3ED; 行业训练</div>
     <div class="panel-desc">当前选题生成的目标行业。切换行业后 AI 生成会适配对应行业场景。</div>
     <div style="margin:14px 0;">
       <span style="color:var(--text-muted);font-size:.78rem;">当前行业：</span>
@@ -1343,12 +1737,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
     </div>
   </div>
   <div class="panel">
-    <div class="panel-title">🤖 AI 训练反馈</div>
+    <div class="panel-title">📊 AI 训练反馈</div>
     <div class="panel-desc">对不满意的选题提交反馈，AI 会记住你的偏好并调整后续生成风格。</div>
     <div id="trainHistoryList">
       <div class="train-history-empty">还没有训练记录，在选题结果页批量选择后提交反馈即可。</div>
     </div>
-    <button class="btn-danger" onclick="clearAllTraining()" style="margin-top:10px;font-size:.74rem;">🗑 清空训练数据</button>
+    <button class="btn-danger" onclick="clearAllTraining()" style="margin-top:10px;font-size:.74rem;">🗑️ 清空训练数据</button>
   </div>
 </div>
 
@@ -1372,10 +1766,66 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Mi
   </div>
 </div>
 
+<!-- 行业训练引导弹窗 -->
+<div id="industryTrainModal" class="industry-modal-overlay" style="display:none;">
+  <div class="industry-modal">
+    <h2>&#x1F4DA; 训练你的 AI</h2>
+    <p class="sub">为了让 <span id="trainIndustryName"></span> 行业的选题更贴合你的需求，建议先进行行业训练。<br>告诉 AI 你的偏好，它会越用越懂你。</p>
+    <div class="industry-modal-btns">
+      <button class="btn-skip" onclick="skipIndustryTrain()">稍后设置</button>
+      <button class="btn-confirm" onclick="startIndustryTrain()">开始训练</button>
+    </div>
+  </div>
+</div>
+
+<!-- 未训练警告弹窗 -->
+<div id="untrainedWarnModal" class="industry-modal-overlay" style="display:none;">
+  <div class="industry-modal">
+    <h2>&#x26A0;&#xFE0F; 尚未进行行业训练</h2>
+    <p class="sub">您当前没有进行<span id="warnIndustryName"></span>行业的训练，生成的选题可能不如您所愿。</p>
+    <div class="industry-modal-btns">
+      <button class="btn-skip" onclick="continueWithoutTrain()">继续生成</button>
+      <button class="btn-confirm" onclick="goToIndustryTrain()">去进行行业训练</button>
+    </div>
+  </div>
+</div>
+
+<!-- IP训练问答弹窗 -->
+<div id="ipTrainModal" class="ip-train-overlay" style="display:none;">
+  <div class="ip-train-panel">
+    <div class="ip-train-header">
+      <div class="ip-train-header-left">
+        <h2 id="trainCatTitle">&#x1F4DA; 训练你的 AI</h2>
+        <span id="trainCatDesc" class="train-cat-desc"></span>
+      </div>
+      <button class="ip-train-close" onclick="closeIpTrain()" title="关闭（保存进度）">&#x2715;</button>
+    </div>
+    
+    <!-- 分类导航 -->
+    <div class="ip-train-cats" id="ipTrainCats"></div>
+    
+    <!-- 进度条 -->
+    <div class="ip-train-progress-bar">
+      <div class="ip-train-progress-fill" id="ipTrainProgressFill" style="width:0%"></div>
+    </div>
+    <div class="ip-train-progress-text" id="ipTrainProgressText">0 / 100</div>
+    
+    <!-- 问题区域：每次3题 -->
+    <div class="ip-train-questions" id="ipTrainQuestions"></div>
+    
+    <!-- 底部按钮 -->
+    <div class="ip-train-footer">
+      <button class="btn-train-skip" onclick="skipIpTrainPage()">跳过此页</button>
+      <button class="btn-train-skip-cat" onclick="skipIpTrainCategory()">跳过此分类</button>
+      <button class="btn-train-next" id="btnIpTrainNext" onclick="nextIpTrainPage()">保存并继续 →</button>
+    </div>
+  </div>
+</div>
+
 <!-- 训练反馈弹窗 -->
 <div id="trainFeedbackOverlay" class="train-feedback-overlay" style="display:none;">
   <div class="train-feedback-box">
-    <h3>🤖 训练 AI 反馈</h3>
+    <h3>🧠 训练 AI 反馈</h3>
     <p class="sub">告诉 AI 这次生成哪里不够好，下次它会改进。</p>
     <div class="selected-count" id="trainSelectedCount"></div>
     <div class="train-issue-grid" id="trainIssueGrid"></div>
@@ -1430,7 +1880,7 @@ const ELEMENTS = {
     positive:['第一次独自去医院的社恐年轻人','刚入职一周还不敢摸鱼的职场新人','不会主动跟老师沟通的小学宝妈'],
     negative:['"宝妈们注意了""打工人必看"（人群太宽泛，没有具体困境）','"喜欢旅游的人"（只是兴趣标签，触发不了强共鸣）'],
   },
-  curious:   { name:'猎奇', emoji:'👁️', desc:'窥探行业内幕', color:'#a855f7',
+  curious:   { name:'猎奇', emoji:'🔍', desc:'窥探行业内幕', color:'#a855f7',
     essence:'输出超出用户日常认知的新鲜信息，用"绝大多数人不知道"的内容勾起好奇心，驱动用户为了解答案而看完视频。',
     criteria:'内容属于用户常识之外、日常接触不到的范畴，可以是行业内幕、冷知识、非常规操作、小众事物。',
     positive:['酒店的烧水壶以前很多人用来煮袜子消毒','自动售货机里的饮料原来是这么补进去的','彩票站老板自己从来不买彩票'],
@@ -1442,7 +1892,7 @@ const ELEMENTS = {
     positive:['身家过亿的老板每天中午吃5块钱的路边摊','教英语的网红老师高考英语只考了50分','健身教练偷偷胖了30斤'],
     negative:['"红色衣服和蓝色衣服各有特点"（只是差异，没有对立）','"这个人喜欢吃甜的那个人喜欢吃咸的"（只是不同选择，没有反差冲突）'],
   },
-  worst:     { name:'最差', emoji:'👎', desc:'踩坑/亏损/翻车', color:'#ef4444',
+  worst:     { name:'最差', emoji:'💣', desc:'踩坑/亏损/翻车', color:'#ef4444',
     essence:'聚焦极端负面体验，做"踩坑、避雷、吐槽"类内容，是八大元素里互动率最高的元素之一。好事不出门，坏事传千里。',
     criteria:'内容带有明确的负面评价，指向"最糟糕、最坑、最没用、最招人烦"的极端负面方向。',
     positive:['租房最容易踩的3个大坑，90%的新人都中过','职场里最招人烦的5种同事','全网评分最低的3部国产电影'],
@@ -1454,13 +1904,13 @@ const ELEMENTS = {
     positive:['马云都在用的时间管理方法','全中国生意最好的一家面馆','美妆界天花板级别的粉底液'],
     negative:['"我家楼下的面馆很好吃"（没有头部属性，没有公众认知度）','"我觉得这款产品很好用"（只有个人评价，没有权威背书）'],
   },
-  nostalgia: { name:'怀旧', emoji:'📼', desc:'回忆/经典老车', color:'#fb923c',
+  nostalgia: { name:'怀旧', emoji:'⏳', desc:'回忆/经典老车', color:'#fb923c',
     essence:'唤醒特定群体的"集体共同记忆"，用过去的事物触发用户的情感共鸣，主打"回忆杀"，提升用户好感和转发意愿。',
     criteria:'内容指向特定年代、特定群体的共同经历，是一群人的回忆，而非个人私事。',
     positive:['90后小时候放学必买的5种零食','二十年前的春节才叫真的过年','小时候玩过的10款经典单机游戏'],
     negative:['"我小时候家里有个旧台灯"（纯个人回忆，没有集体共鸣）','"十年前的手机功能很少"（只是客观陈述，没有唤醒情感）'],
   },
-  hormone:   { name:'荷尔蒙', emoji:'💘', desc:'两性/情感/面子', color:'#f472b6',
+  hormone:   { name:'荷尔蒙', emoji:'🔥', desc:'两性/情感/面子', color:'#f472b6',
     essence:'围绕"异性好感、个人魅力、情感择偶"展开内容，触发人的本能注意力。核心是让用户感知到"能提升自身吸引力"。',
     criteria:'内容必须和"异性好感、个人魅力、情感择偶"直接挂钩，能让用户关联到自身的吸引力价值。',
     positive:['男生这么穿女生好感度直接翻倍','相亲时最加分的3个小细节','女生最讨厌的男生穿搭排行'],
@@ -1649,6 +2099,148 @@ xiaohongshu: [
 let historySearchTerm = '';
 let historySearchTimer = null;
 let _isGenerating = false;
+let _pendingGenerate = null;
+let _untrainedContinue = false;
+
+// ===== IP 训练问答系统 =====
+const IP_TRAIN_QUESTIONS = [
+  // 一、账号基础与定位（Q1-Q20）
+  {c:0, q:"你目前深耕的行业/领域是什么？从业多久？", t:"text"},
+  {c:0, q:"你做抖音账号的核心目的是什么？", t:"quick", opts:["引流获客","变现赚钱","打造个人品牌","副业增收","记录生活","招商加盟","知识付费"]},
+  {c:0, q:"你希望账号最终呈现的整体风格是什么？", t:"quick", opts:["专业严肃","接地气","幽默轻松","治愈温暖","犀利干货","高端质感","亲民老板"]},
+  {c:0, q:"你目前有没有现成的抖音账号？现有账号数据、粉丝、问题分别是什么？", t:"text"},
+  {c:0, q:"你做账号的短期目标（1-3个月）和长期目标（1年以上）分别是什么？", t:"text"},
+  {c:0, q:"你想主要吸引哪一类人群关注？请描述精准年龄、性别、职业、痛点、消费水平。", t:"text"},
+  {c:0, q:"你绝对不想吸引的人群是什么？需要规避哪些粉丝群体？", t:"text"},
+  {c:0, q:"你所在领域的同行账号，你喜欢的3个、反感的3个分别是什么？原因？", t:"text"},
+  {c:0, q:"你认为自己和同行相比，最大的优势是什么？（经验、资源、口才、案例、价格、认知、圈层等）", t:"text"},
+  {c:0, q:"你目前在行业内的短板、劣势、不想展示的点是什么？", t:"text"},
+  {c:0, q:"你希望粉丝给你贴上的3个核心标签是什么？", t:"text"},
+  {c:0, q:"你绝对不想被贴上的负面标签是什么？", t:"text"},
+  {c:0, q:"你的账号主打城市/地域属性吗？是否做本地同城流量？", t:"quick", opts:["是，主打本地同城","全国范围","两者兼顾","暂不确定"]},
+  {c:0, q:"你账号主打内容形式偏好？", t:"quick", opts:["口播","剧情","测评","干货图文","vlog","实景实操","问答","探店"]},
+  {c:0, q:"你每天可稳定投入做账号的时间有多少？（拍摄、剪辑、复盘、直播）", t:"quick", opts:["1小时以内","1-3小时","3-5小时","5小时以上","全职投入"]},
+  {c:0, q:"你能否稳定日更/周更？可接受的更新频率是多少？", t:"quick", opts:["日更","每周3-5条","每周1-2条","不定期更新"]},
+  {c:0, q:"你是否接受出镜？出镜有无镜头恐惧、表情僵硬、语速过快/过慢等问题？", t:"quick", opts:["愿意出镜，无问题","愿意出镜，有些不自然","不愿意出镜","可接受半出镜/背影"]},
+  {c:0, q:"你是否愿意做直播？直播频率、时长、直播内容偏好是什么？", t:"text"},
+  {c:0, q:"你做账号的核心底线和禁忌内容是什么？（不聊、不碰、不展示的内容）", t:"text"},
+  {c:0, q:"你希望账号整体调性是大众化吸粉，还是小众精准高变现？", t:"quick", opts:["大众化吸粉","小众精准高变现","先吸粉后精准","边吸粉边变现"]},
+  
+  // 二、人设深度挖掘（Q21-Q40）
+  {c:1, q:"你的年龄、籍贯、成长城市、核心身份职业是什么？", t:"text"},
+  {c:1, q:"你的完整从业经历、转行经历、创业经历详细梳理？", t:"text"},
+  {c:1, q:"你入行的契机是什么？是什么让你坚持做这个行业？", t:"text"},
+  {c:1, q:"你人生中最关键的3个转折点/高光时刻是什么？", t:"text"},
+  {c:1, q:"你从业过程中最挫败、最崩溃、最想放弃的阶段是什么？如何熬过来的？", t:"text"},
+  {c:1, q:"你身上最大的人设反差是什么？（外表vs内心、职业vs生活、普通人vs专业能力）", t:"text"},
+  {c:1, q:"身边朋友、客户、同事对你最多的评价是什么？", t:"text"},
+  {c:1, q:"你有哪些独家资质、证书、奖项、行业背书、权威经历？", t:"text"},
+  {c:1, q:"你有哪些普通人没有的稀缺经历、圈层资源、独家认知？", t:"text"},
+  {c:1, q:"你从小到大最独特的成长路径是什么？（辍学创业、自学成才、跨界转行、异地打拼等）", t:"text"},
+  {c:1, q:"你性格最鲜明的3个特点是什么？（直爽、较真、温柔、犀利、接地气、严谨等）", t:"text"},
+  {c:1, q:"你说话的语言风格是什么？", t:"quick", opts:["直白","幽默","毒舌","温柔","干货密集","娓娓道来","激情澎湃"]},
+  {c:1, q:"你生活里的爱好、习惯、小癖好是什么？可用于丰富人设细节", t:"text"},
+  {c:1, q:"你最擅长解决别人的什么问题？最常被人咨询的问题是什么？", t:"text"},
+  {c:1, q:"你有哪些独家方法论、总结、行业口诀、实操流程？", t:"text"},
+  {c:1, q:"你和粉丝之间想建立什么关系？", t:"quick", opts:["老师","朋友","老板","前辈","陪伴者","同行伙伴"]},
+  {c:1, q:"你有没有个人信念、座右铭、做事原则？", t:"text"},
+  {c:1, q:"你最反感行业内的哪些乱象、套路、割韭菜行为？", t:"text"},
+  {c:1, q:"你做内容想传递的核心价值观是什么？", t:"text"},
+  {c:1, q:"你身上最能打动陌生人的真诚点、共情点是什么？", t:"text"},
+  
+  // 三、内容选题与创作能力（Q41-Q60）
+  {c:2, q:"你所在领域，新手最容易踩的10个坑是什么？", t:"text"},
+  {c:2, q:"粉丝最常问你的20个高频问题是什么？", t:"text"},
+  {c:2, q:"行业内大家都在做错、但你做对的事情是什么？", t:"text"},
+  {c:2, q:"行业内没人敢说、但你愿意实话实说的真相是什么？", t:"text"},
+  {c:2, q:"你可以持续输出的干货板块有哪5-10个系列？", t:"text"},
+  {c:2, q:"你最擅长的实操案例、落地故事有多少个？能否逐一复盘？", t:"text"},
+  {c:2, q:"你是否有大量真实客户案例、前后对比、成功结果可以展示？", t:"quick", opts:["有大量真实案例","有部分案例","案例较少","暂无案例"]},
+  {c:2, q:"你平时获取选题的渠道是什么？（客户问题、同行、热点、自身经历）", t:"text"},
+  {c:2, q:"你能不能接受追行业热点？追热点的底线和尺度是什么？", t:"text"},
+  {c:2, q:"你最想通过视频教会粉丝的3大核心能力是什么？", t:"text"},
+  {c:2, q:"你内容的核心价值是帮粉丝做什么？", t:"quick", opts:["省钱","避坑","赚钱","成长","变美","解压","获资源","提升认知"]},
+  {c:2, q:"你有没有独家技巧、提速方法、精简流程、行业捷径？", t:"text"},
+  {c:2, q:"你过往失败的案例、翻车经历，是否愿意公开复盘？", t:"quick", opts:["愿意公开复盘","可以有选择地讲","不愿意","看情况"]},
+  {c:2, q:"你觉得同行内容最大的通病是什么？你要如何差异化避开？", t:"text"},
+  {c:2, q:"你适合短平快干货，还是长深度解析内容？", t:"quick", opts:["短平快干货","长深度解析","两者结合","视选题而定"]},
+  {c:2, q:"你是否有系列化内容规划？（新手入门、进阶提升、避坑指南、案例拆解）", t:"text"},
+  {c:2, q:"你能不能稳定产出情绪价值内容？（共情、打气、治愈、破局）", t:"quick", opts:["很擅长","可以尝试","不擅长","暂不考虑"]},
+  {c:2, q:"你内容中可以加入哪些个人故事、生活细节增强记忆点？", t:"text"},
+  {c:2, q:"你是否愿意做粉丝问答、私信答疑、评论区问题汇总内容？", t:"quick", opts:["愿意","可以尝试","不太愿意","看情况"]},
+  {c:2, q:"你内容绝对不做的题材、不蹭的热点、不讲的话题是什么？", t:"text"},
+  
+  // 四、变现模式与商业闭环（Q61-Q80）
+  {c:3, q:"你目前的变现方式是什么？（产品、服务、课程、咨询、实体店、招商、带货、广告）", t:"text"},
+  {c:3, q:"你未来想拓展的变现渠道有哪些？", t:"text"},
+  {c:3, q:"你的核心产品/服务的价格体系、优势、痛点解决点是什么？", t:"text"},
+  {c:3, q:"你的产品/服务对比同行，最大的成交理由是什么？", t:"text"},
+  {c:3, q:"客户不买单的常见顾虑、犹豫点、反对话术有哪些？", t:"text"},
+  {c:3, q:"你账号是先涨粉后变现，还是边涨粉边变现？", t:"quick", opts:["先涨粉后变现","边涨粉边变现","快速变现优先","看阶段调整"]},
+  {c:3, q:"你是否接受短视频带货？带货品类、选品标准是什么？", t:"text"},
+  {c:3, q:"你是否接受知识付费、私域咨询、一对一服务变现？", t:"quick", opts:["接受知识付费","接受私域咨询","接受一对一服务","都可以","暂不考虑付费"]},
+  {c:3, q:"你是否做同城引流？到店转化、团购、本地服务的模式？", t:"text"},
+  {c:3, q:"你私域承接流程是否完善？短视频-私信-微信-成交的链路？", t:"quick", opts:["已完善","部分完善","尚未搭建","打算搭建"]},
+  {c:3, q:"你能给付费用户提供的独家价值、售后、增值服务是什么？", t:"text"},
+  {c:3, q:"你过往最高成交案例、最大单、最经典转化故事是什么？", t:"text"},
+  {c:3, q:"你对账号商业感的接受度？是否反感营销感、成交话术？", t:"quick", opts:["接受强商业感","适度营销","反感硬广","视内容而定"]},
+  {c:3, q:"你是否愿意做直播成交、直播答疑、直播转化？", t:"text"},
+  {c:3, q:"你账号的盈利天花板、现阶段瓶颈分别是什么？", t:"text"},
+  {c:3, q:"你是否接受品牌合作、广告植入、行业联名？", t:"quick", opts:["接受","有选择接受","暂不接受","看报价"]},
+  {c:3, q:"你如何平衡内容质感和营销转化？避免硬广掉粉？", t:"text"},
+  {c:3, q:"你精准付费客户的画像是什么？（年龄、需求、消费能力）", t:"text"},
+  {c:3, q:"你目前获客最大的难点是什么？缺流量、缺信任、缺转化、缺口碑？", t:"text"},
+  {c:3, q:"你希望账号多久实现盈利、回本、稳定创收？", t:"text"},
+  
+  // 五、镜头表现与拍摄风格（Q81-Q90）
+  {c:4, q:"你面对镜头最大的问题是什么？", t:"quick", opts:["紧张","僵硬","忘词","不自然","表情单一","没有问题"]},
+  {c:4, q:"你语速偏快还是偏慢？有没有口头禅、语病、冗余话术？", t:"text"},
+  {c:4, q:"你更喜欢坐着拍、站着拍、实景走动拍、户外拍还是店内拍？", t:"text"},
+  {c:4, q:"你穿衣风格偏好？", t:"quick", opts:["正式","休闲","极简","接地气","职业","潮流"]},
+  {c:4, q:"你是否愿意配合脚本、台词、情绪、镜头节奏调整？", t:"quick", opts:["愿意","可以尝试","希望自由发挥","看情况"]},
+  {c:4, q:"你更喜欢聊天式口播，还是干货朗读式、复盘式、吐槽式表达？", t:"text"},
+  {c:4, q:"你镜头表现力的优势是什么？眼神、感染力、情绪、真诚度、逻辑？", t:"text"},
+  {c:4, q:"你是否接受素颜、淡妆、固定形象出镜？有无形象禁忌？", t:"text"},
+  {c:4, q:"你偏好的视频画面质感？", t:"quick", opts:["明亮清爽","高级质感","烟火接地气","纪实真实"]},
+  {c:4, q:"你能否接受反复重拍、打磨单条视频质量？", t:"quick", opts:["可以接受","偶尔可以","不太能接受","看情况"]},
+  
+  // 六、差异化与记忆点终极挖掘（Q91-Q100）
+  {c:5, q:"别人模仿不了你的核心能力、经历、资源、认知是什么？", t:"text"},
+  {c:5, q:"你身上最有故事性、最容易出圈的1-3个经历是什么？", t:"text"},
+  {c:5, q:"你有什么小众、冷门、稀缺的行业认知，普通人不知道？", t:"text"},
+  {c:5, q:"你能做到'人无我有、人有我优'的具体点是什么？", t:"text"},
+  {c:5, q:"你最容易引发粉丝共鸣、点赞、收藏、转发的内容方向是什么？", t:"text"},
+  {c:5, q:"你账号可以打造的专属符号是什么？（口头禅、手势、开场、结尾、固定栏目）", t:"text"},
+  {c:5, q:"你最想帮粉丝解决的终极痛点是什么？（焦虑、没钱、不会、踩坑、迷茫）", t:"text"},
+  {c:5, q:"如果用一句话定义你的IP，你希望是什么？", t:"text"},
+  {c:5, q:"你做账号最坚定的初心、长期坚持的理由是什么？", t:"text"},
+  {c:5, q:"你希望一年后，你的账号、个人品牌、生活状态变成什么样？", t:"text"}
+];
+
+const IP_TRAIN_CATEGORIES = [
+  {name:"账号基础与定位", icon:"🏗️", desc:"夯实账号根基"},
+  {name:"人设深度挖掘", icon:"🎭", desc:"塑造独特人设"},
+  {name:"内容选题与创作", icon:"📝", desc:"建立内容体系"},
+  {name:"变现模式与闭环", icon:"💰", desc:"打通商业模式"},
+  {name:"镜头表现与风格", icon:"🎬", desc:"提升镜头表现"},
+  {name:"差异化与记忆点", icon:"⭐", desc:"打造终极壁垒"}
+];
+
+function getTrainStorageKey() { return 'wjTrainAnswers_' + getIndustry(); }
+function getTrainProgressKey() { return 'wjTrainProgress_' + getIndustry(); }
+
+function loadTrainAnswers() {
+  try { return JSON.parse(localStorage.getItem(getTrainStorageKey())||'{}'); } catch { return {}; }
+}
+function saveTrainAnswers(answers) {
+  localStorage.setItem(getTrainStorageKey(), JSON.stringify(answers));
+}
+function loadTrainProgress() {
+  try { return JSON.parse(localStorage.getItem(getTrainProgressKey())||'{"cat":0,"idx":0}'); } catch { return {cat:0,idx:0}; }
+}
+function saveTrainProgress(progress) {
+  localStorage.setItem(getTrainProgressKey(), JSON.stringify(progress));
+}
 let _storageMigrated_v1 = safeGet('_storageMigrated_v1', false);
 let lastGenHasElements = false;
 let undoStack = [];
@@ -1693,7 +2285,7 @@ async function supaInit() {
   try {
     const sb = window.supabase || supabase;
     supabase = sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: false },
+      auth: { persistSession: true },
       db: { schema: 'public' }
     });
     getSupaDeviceId();
@@ -2216,7 +2808,7 @@ function setTheme(t) {
   document.querySelectorAll('.theme-opt').forEach(b => b.classList.toggle('active', b.dataset.theme===t));
 }
 
-function loadAppName() { return '林岛AI'; }
+function loadAppName() { return '🚀 林岛AI'; }
 
 // 类别
 function getCustomCategories() { customCategories = safeGet('usedcar_custom_cats', {}); return customCategories; }
@@ -2788,9 +3380,9 @@ async function renderHistory() {
   
   if (!filtered.length) {
     if (historySearchTerm) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>未找到匹配的选题</p></div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F4CB;</div><p>未找到匹配的选题</p></div>';
     } else {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>暂无历史选题<br>回到工作台生成选题后会自动保存</p></div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F4CB;</div><p>暂无历史选题<br>回到工作台生成选题后会自动保存</p></div>';
     }
   } else {
     // 排序：最新在前
@@ -2814,7 +3406,7 @@ async function renderHistory() {
   
   _historySelectAll = false;
   const btnSel = document.getElementById('btnHistorySelectAll');
-  if (btnSel) btnSel.textContent = '☑ 全选';
+  if (btnSel) btnSel.textContent = '☐ 全选';
   const btnDel = document.getElementById('btnHistoryDeleteSel');
   if (btnDel) btnDel.style.display = 'none';
 }
@@ -2830,7 +3422,7 @@ function toggleSelectAllHistory() {
   const cbs = document.querySelectorAll('#historyList .cb');
   cbs.forEach(cb => { cb.checked = _historySelectAll; cb.closest('.history-item')?.classList.toggle('selected', _historySelectAll); });
   const btn = document.getElementById('btnHistorySelectAll');
-  if (btn) btn.textContent = _historySelectAll ? '☐ 取消全选' : '☑ 全选';
+  if (btn) btn.textContent = _historySelectAll ? '☑ 取消全选' : '☐ 全选';
   updateHistorySelBtns();
 }
 
@@ -2896,7 +3488,7 @@ function renderElements() {
       + '<span class="elem-emoji">'+e.emoji+'</span>'
       + '<span class="elem-name">'+e.name+'</span>'
       + '<span class="elem-desc">'+e.desc+'</span>'
-      + '<span class="elem-info" onclick="event.stopPropagation();showElemDetail(\''+k+'\')" title="查看详细解释">?</span>'
+      + '<span class="elem-info" onclick="event.stopPropagation();showElemDetail(\''+k+'\')" title="查看详细解释">ℹ️</span>'
       + '</div>';
   }).join('');
   renderSelectedElemsBar();
@@ -3047,10 +3639,10 @@ async function testApiConnection() {
     const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 15000);
     const resp = await fetch(endpoint, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key }, body:JSON.stringify({ model:model||'gpt-4o', messages:[{role:'user',content:'回复ok'}], max_tokens:5 }), signal:ctrl.signal });
     clearTimeout(t);
-    if (resp.ok) { if (statusEl) { statusEl.textContent = '✓ 连接成功！API 可用'; statusEl.style.color = 'var(--success)'; } }
-    else { const txt = await resp.text().catch(()=>''); if (statusEl) { statusEl.textContent = '✗ 连接失败：HTTP '+resp.status+' '+txt.substring(0,80); statusEl.style.color = 'var(--danger)'; } }
+    if (resp.ok) { if (statusEl) { statusEl.textContent = '✅ 连接成功！API 可用'; statusEl.style.color = 'var(--success)'; } }
+    else { const txt = await resp.text().catch(()=>''); if (statusEl) { statusEl.textContent = '❌ 连接失败：HTTP '+resp.status+' '+txt.substring(0,80); statusEl.style.color = 'var(--danger)'; } }
   } catch(e) {
-    if (statusEl) { statusEl.textContent = '✗ 连接失败：'+(e.name==='AbortError'?'请求超时':e.message.substring(0,80)); statusEl.style.color = 'var(--danger)'; }
+    if (statusEl) { statusEl.textContent = '❌ 连接失败：'+(e.name==='AbortError'?'请求超时':e.message.substring(0,80)); statusEl.style.color = 'var(--danger)'; }
   }
 }
 
@@ -3481,8 +4073,8 @@ function wjRenderInspire() {
     '<div class="wj-inspire-cat'+(c.id===wjActiveInspireCat?' active':'')+'" onclick="wjSelectInspireCat(\''+c.id+'\')">'
     +'<span>'+c.name+'</span>'
     +'<span class="wj-inspire-cat-actions">'
-    +'<span class="wj-inspire-cat-btn" onclick="event.stopPropagation();wjRenameInspireCat(\''+c.id+'\')" title="重命名">✎</span>'
-    +'<span class="wj-inspire-cat-btn" onclick="event.stopPropagation();wjDeleteInspireCat(\''+c.id+'\')" title="删除">✕</span>'
+    +'<span class="wj-inspire-cat-btn" onclick="event.stopPropagation();wjRenameInspireCat(\''+c.id+'\')" title="重命名">✏️</span>'
+    +'<span class="wj-inspire-cat-btn" onclick="event.stopPropagation();wjDeleteInspireCat(\''+c.id+'\')" title="删除">🗑️</span>'
     +'</span></div>'
   ).join('')
   +'<div class="wj-inspire-addcat" onclick="wjAddInspireCat()">+ 新建分类</div>';
@@ -3546,15 +4138,15 @@ function wjRenderInspireItems(catId) {
 
   container.innerHTML = ''
     +'<div class="wj-inspire-toolbar">'
-    +'<button onclick="wjAddTextInspiration()">📝 打字录入</button>'
-    +'<button onclick="wjUploadInspireFile()">📁 上传文件</button>'
+    +'<button onclick="wjAddTextInspiration()">⌨️ 打字录入</button>'
+    +'<button onclick="wjUploadInspireFile()">📤 上传文件</button>'
     +'<input type="file" id="wjInspireFileInput" style="display:none;" onchange="wjHandleInspireFile(this)">'
     +'</div>'
     +'<div class="wj-inspire-list">'
     +(items.length === 0 ? '<div class="wj-inspire-empty">暂无素材，点击上方按钮添加</div>' : items.map(it => {
       const date = new Date(it.time).toLocaleDateString('zh-CN');
       return '<div class="wj-inspire-item" onclick="wjViewInspireDetail(\''+it.id+'\')">'
-        +'<button class="wj-inspire-item-del" onclick="event.stopPropagation();wjDeleteInspireItem(\''+it.id+'\')">✕</button>'
+        +'<button class="wj-inspire-item-del" onclick="event.stopPropagation();wjDeleteInspireItem(\''+it.id+'\')">🗑️</button>'
         +'<div class="wj-inspire-item-title">'+escapeHtml(it.title)+'</div>'
         +'<div class="wj-inspire-item-preview">'+escapeHtml((it.body||'').substring(0,30)+(it.body&&it.body.length>30?'…':''))+'</div>'
         +'<div class="wj-inspire-item-meta"><span>'+date+'</span><span>'+it.type+'</span></div>'
@@ -3567,7 +4159,7 @@ function wjAddTextInspiration() {
   if (!wjActiveInspireCat) { showToast('请先选择一个分类'); return; }
   const overlay = document.createElement('div'); overlay.className = 'wj-inspire-detail-overlay';
   overlay.innerHTML = '<div class="wj-inspire-detail-box">'
-    +'<div class="wj-detail-title">📝 新增素材</div>'
+    +'<div class="wj-detail-title">➕ 新增素材</div>'
     +'<input id="wjNewInspireTitle" placeholder="素材标题" style="width:100%;padding:8px;margin-bottom:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.78rem;">'
     +'<textarea id="wjNewInspireBody" placeholder="素材正文内容..." style="width:100%;min-height:120px;padding:8px;margin-bottom:10px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.76rem;resize:vertical;font-family:inherit;"></textarea>'
     +'<div class="wj-detail-btns"><button onclick="this.closest(\'.wj-inspire-detail-overlay\').remove()">取消</button><button style="background:var(--accent);color:var(--bg-card);border:none;" onclick="wjSaveTextInspiration()">保存</button></div>'
@@ -3870,6 +4462,13 @@ function disableGenButtons(disabled) {
 }
 
 async function generateAndGo() {
+  // 行业训练检查
+  if (!isIndustryTrained()) {
+    _pendingGenerate = () => generateAndGo();
+    _untrainedContinue = false;
+    showUntrainedWarning();
+    return;
+  }
   if (_isGenerating) return;
   _apiErrorNote = null;
   if (selectedCats.size === 0) { showToast('请至少选择一个话题类别'); return; }
@@ -3906,6 +4505,12 @@ async function generateAndGo() {
   }
 }
 async function randomAndGo() {
+  if (!isIndustryTrained()) {
+    _pendingGenerate = () => randomAndGo();
+    _untrainedContinue = false;
+    showUntrainedWarning();
+    return;
+  }
   if (_isGenerating) { showToast('正在生成中，请稍候…'); return; }
   const cfg = getApiConfig('topic'); let topics = null;
   _isGenerating = true; disableGenButtons(true);
@@ -4073,9 +4678,9 @@ function renderScriptBlock(topic) {
     : s._error ? '<span class="script-loading" style="color:var(--danger);">生成失败: '+escapeHtml(s._error)+'</span>'
     : '';
   const body = s.text ? '<div class="script-body">'+escapeHtml(s.text)+'</div>' : '';
-  const actions = s.text ? '<div class="script-actions"><button onclick="event.stopPropagation();copyScriptText(\''+topic.id+'\')">📋 复制全文</button><button onclick="event.stopPropagation();regenerateScript(\''+topic.id+'\')">🔄 重新生成</button></div>' : '';
+  const actions = s.text ? '<div class="script-actions"><button onclick="event.stopPropagation();copyScriptText(\''+topic.id+'\')">📋 复制全文</button><button onclick="event.stopPropagation();regenerateScript(\''+topic.id+'\')">&#x1F504; 重新生成</button></div>' : '';
   return '<div class="script-block" onclick="event.stopPropagation();">'
-    +'<div class="script-label">📝 AI生成文案</div>'
+    +'<div class="script-label">🤖 AI生成文案</div>'
     +status
     +body
     +actions
@@ -4094,7 +4699,7 @@ function regenerateScript(id) {
   delete scripts[id];
   saveScripts(scripts);
   const btn = document.getElementById('btnScript_'+id);
-  if (btn) { btn.disabled = false; btn.textContent = '📝 生成文案'; }
+  if (btn) { btn.disabled = false; btn.textContent = '✍️ 生成文案'; }
   renderCards();
   generateScript(id);
 }
@@ -4272,7 +4877,7 @@ async function reviewScript() {
     setTimeout(() => { progress.style.display = 'none'; fill.style.background = ''; }, 1000);
   }
 
-  btn.disabled = false; btn.textContent = '🔍 审核文案';
+  btn.disabled = false; btn.textContent = '📋 审核文案';
 }
 
 // ============================================================
@@ -4322,8 +4927,8 @@ function injectReviewFeedbackUI(container) {
     const actions = document.createElement('div');
     actions.className = 'review-item-actions';
     actions.innerHTML =
-      '<button class="fb-correct" onclick="event.stopPropagation();handleReviewCorrect(this,' + idx + ')" title="这条判断正确">👍 审核正确</button>' +
-      '<button class="fb-wrong" onclick="event.stopPropagation();handleReviewWrong(this,' + idx + ')" title="这条判断有误">👎 审核不对</button>' +
+      '<button class="fb-correct" onclick="event.stopPropagation();handleReviewCorrect(this,' + idx + ')" title="这条判断正确">✅ 审核正确</button>' +
+      '<button class="fb-wrong" onclick="event.stopPropagation();handleReviewWrong(this,' + idx + ')" title="这条判断有误">❌ 审核不对</button>' +
       '<button class="fb-edit" onclick="event.stopPropagation();handleReviewEdit(this,' + idx + ')" title="纠正这条结论">✏️ 纠正</button>' +
       '<span class="review-fb-status" style="display:none;"></span>';
     wrap.appendChild(actions);
@@ -4363,8 +4968,8 @@ function injectReviewFeedbackUI(container) {
       const actions = document.createElement('div');
       actions.className = 'review-item-actions';
       actions.innerHTML =
-        '<button class="fb-correct" onclick="event.stopPropagation();handleReviewCorrect(this,\'li_' + liIdx + '\')" title="这条判断正确">👍 审核正确</button>' +
-        '<button class="fb-wrong" onclick="event.stopPropagation();handleReviewWrong(this,\'li_' + liIdx + '\')" title="这条判断有误">👎 审核不对</button>' +
+        '<button class="fb-correct" onclick="event.stopPropagation();handleReviewCorrect(this,\'li_' + liIdx + '\')" title="这条判断正确">✅ 审核正确</button>' +
+        '<button class="fb-wrong" onclick="event.stopPropagation();handleReviewWrong(this,\'li_' + liIdx + '\')" title="这条判断有误">❌ 审核不对</button>' +
         '<button class="fb-edit" onclick="event.stopPropagation();handleReviewEdit(this,\'li_' + liIdx + '\')" title="纠正这条结论">✏️ 纠正</button>' +
         '<span class="review-fb-status" style="display:none;"></span>';
       liWrap.appendChild(actions);
@@ -4390,15 +4995,15 @@ function updateReviewItemState(wrap, type, text) {
   if (!statusEl) return;
   statusEl.style.display = 'inline';
   if (type === 'correct') {
-    statusEl.textContent = '✓ 已确认正确';
+    statusEl.textContent = '✅ 已确认正确';
     statusEl.className = 'review-fb-status correct';
     wrap.style.borderColor = 'var(--success)';
   } else if (type === 'wrong') {
-    statusEl.textContent = '✗ 已标记有误';
+    statusEl.textContent = '❌ 已标记有误';
     statusEl.className = 'review-fb-status wrong';
     wrap.style.borderColor = 'var(--danger)';
   } else if (type === 'edit') {
-    statusEl.textContent = '✎ 已纠正: ' + (text ? text.substring(0, 30) + (text.length > 30 ? '…' : '') : '');
+    statusEl.textContent = '✅ 已纠正: ' + (text ? text.substring(0, 30) + (text.length > 30 ? '…' : '') : '');
     statusEl.className = 'review-fb-status';
     statusEl.style.color = 'var(--info)';
     wrap.style.borderColor = 'var(--info)';
@@ -4429,7 +5034,7 @@ async function handleReviewCorrect(btn, idx) {
   });
 
   renderReviewTrainingHistory();
-  showToast('已标记为审核正确 ✓');
+  showToast('已标记为审核正确 ✅');
 }
 
 async function handleReviewWrong(btn, idx) {
@@ -4450,7 +5055,7 @@ async function handleReviewWrong(btn, idx) {
   });
 
   renderReviewTrainingHistory();
-  showToast('已标记为审核有误 ✗');
+  showToast('已标记为审核有误 ❌');
 }
 
 function handleReviewEdit(btn, idx) {
@@ -4491,7 +5096,7 @@ async function saveReviewEdit(btn, idx) {
   });
 
   renderReviewTrainingHistory();
-  showToast('纠正已记录 ✓');
+  showToast('纠正已记录 ✅');
 }
 
 function cancelReviewEdit(btn, idx) {
@@ -4515,10 +5120,10 @@ async function submitReviewGlobalFeedback() {
     originalText: _currentReviewText ? _currentReviewText.substring(0, 300) : ''
   });
 
-  status.textContent = '反馈已记录 ✓';
+  status.textContent = '反馈已记录 ✅';
   input.value = '';
   renderReviewTrainingHistory();
-  showToast('整体反馈已记录 ✓');
+  showToast('整体反馈已记录 ✅');
   setTimeout(() => { status.textContent = ''; }, 3000);
 }
 
@@ -4637,7 +5242,7 @@ async function generateScriptStandalone() {
     setTimeout(() => { progress.style.display = 'none'; fill.style.background = ''; }, 1000);
   }
 
-  btn.disabled = false; btn.textContent = '🚀 生成文案';
+  btn.disabled = false; btn.textContent = '✍️ 生成文案';
 }
 
 // ============================================================
@@ -4686,7 +5291,7 @@ function submitSuggestion(id) {
   const btn = input.nextElementSibling;
   if (btn) btn.style.display = 'none';
   status.style.display = 'inline';
-  status.textContent = '建议已记录 ✓';
+  status.textContent = '建议已记录 ?';
   setTimeout(() => { renderCards(); }, 2000);
 }
 
@@ -4763,7 +5368,7 @@ function renderResultBar() {
 function renderCards() {
   const grid = document.getElementById('topicGrid'); if (!grid) return;
   if (currentTopics.length === 0) {
-    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>还没有生成选题<br>回到工作台选好元素和类别，点击生成吧</p></div>';
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F4CB;</div><p>还没有生成选题<br>回到工作台选好元素和类别，点击生成吧</p></div>';
     return;
   }
   const allCats = getAllCategories();
@@ -4787,25 +5392,25 @@ function renderCards() {
         +'<div class="edit-btns"><button class="btn-save-edit" onclick="saveEdit(\''+t.id+'\')">保存</button><button class="btn-cancel-edit" onclick="cancelEdit()">取消</button></div>'
         +'</div>';
     } else {
-      bodyHtml = (t.hook?'<div class="topic-hook">📢 '+escapeHtml(t.hook)+'</div>':'')
+      bodyHtml = (t.hook?'<div class="topic-hook">🪝 '+escapeHtml(t.hook)+'</div>':'')
         +'<div class="topic-detail">'
-        +'<span>🔍 猎奇 '+t.scoreDetail.curiosity+'</span>'
-        +'<span>🎬 实拍 '+t.scoreDetail.feasibility+'</span>'
-        +'<span>⚠️ 争议 '+t.scoreDetail.controversy+'</span>'
-        +'<span>💬 方言 '+t.scoreDetail.dialect+'</span>'
-        +'<span>⏰ 时效 '+t.scoreDetail.timeliness+'</span>'
-        +'<span>🔥 元素匹配 +'+(t.scoreDetail.elementMatch||0)+'</span>'
+        +'<span>🔥 猎奇 '+t.scoreDetail.curiosity+'</span>'
+        +'<span>📹 实拍 '+t.scoreDetail.feasibility+'</span>'
+        +'<span>⚡ 争议 '+t.scoreDetail.controversy+'</span>'
+        +'<span>🗣️ 方言 '+t.scoreDetail.dialect+'</span>'
+        +'<span>⏱️ 时效 '+t.scoreDetail.timeliness+'</span>'
+        +'<span>🎯 元素匹配 +'+(t.scoreDetail.elementMatch||0)+'</span>'
         +'</div>'
         +'<div class="topic-actions">'
         +'<button class="copy-btn" onclick="copyText(this,\''+t.id+'\',\'title\')">📋 复制标题</button>'
-        +'<button class="copy-btn" onclick="copyText(this,\''+t.id+'\',\'hook\')">🔗 复制钩子</button>'
+        +'<button class="copy-btn" onclick="copyText(this,\''+t.id+'\',\'hook\')">📋 复制钩子</button>'
         +'<button class="vote-btn like '+(voteState==='like'?'on':'')+'" onclick="voteTopic(\''+t.id+'\',\'like\')">👍</button>'
         +'<button class="vote-btn dislike '+(voteState==='dislike'?'on':'')+'" onclick="voteTopic(\''+t.id+'\',\'dislike\')">👎</button>'
         +'<button class="fav-btn'+(isFav?' faved':'')+'" onclick="toggleFav(\''+t.id+'\')">'+(isFav?'★':'☆')+'</button>'
         +'<button onclick="editTopic(\''+t.id+'\')">✏️ 编辑</button>'
         +'<button class="block-btn" onclick="event.stopPropagation();blockTopic(\''+t.id+'\')">🚫 永久不再出现</button>'
-        +'<button class="delete-btn" onclick="confirmDelete(\''+t.id+'\')">🗑 删除</button>'
-        +'<button class="btn-gen-script" onclick="event.stopPropagation();generateScript(\''+t.id+'\')" id="btnScript_'+t.id+'">📝 生成文案</button>'
+        +'<button class="delete-btn" onclick="confirmDelete(\''+t.id+'\')">🗑️ 删除</button>'
+        +'<button class="btn-gen-script" onclick="event.stopPropagation();generateScript(\''+t.id+'\')" id="btnScript_'+t.id+'">✍️ 生成文案</button>'
         +'</div>'
         +renderScriptBlock(t)
         +renderSuggestionBar(t);
@@ -4813,7 +5418,7 @@ function renderCards() {
 
     const tagHtml = '<span class="tag tag-cat">'+catLabel+'</span>'
       +'<span class="tag tag-act">'+t.action+'</span>'
-      +(t.targetAudience?'<span class="tag tag-audience">🎯 '+escapeHtml(t.targetAudience)+' <button class="audience-copy-btn" onclick="event.stopPropagation();copyAudience(\''+t.id+'\',this)" title="复制目标人群">📋</button></span>':'')
+      +(t.targetAudience?'<span class="tag tag-audience">👥 '+escapeHtml(t.targetAudience)+' <button class="audience-copy-btn" onclick="event.stopPropagation();copyAudience(\''+t.id+'\',this)" title="复制目标人群">📋</button></span>':'')
       +(t.isCustom?'<span class="tag tag-custom">自定义</span>':'')
       +(t.isDynamic?'<span class="tag tag-dynamic">动态合成</span>':'')
       +(t.isApi?'<span class="tag tag-api">AI生成</span>':'')
@@ -4996,7 +5601,7 @@ function voteTopic(id, type) {
     if (pending.length > 50) pending = pending.slice(-50);
     wjSavePendingRevise(pending);
   }
-  showToast(type === 'like' ? '👍 已标记喜欢' : '👎 已标记不喜欢（加入待修改池）');
+  showToast(type === 'like' ? '❤️ 已标记喜欢' : '👎 已标记不喜欢（加入待修改池）');
   renderCards();
 }
 
@@ -5178,7 +5783,7 @@ function copyText(btn, id, type) {
   if (!text) { showToast('无内容可复制'); return; }
   navigator.clipboard.writeText(text).then(() => {
     btn.classList.add('copied'); btn.textContent = type === 'title' ? '已复制标题' : '已复制钩子'; showToast('已复制');
-    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = type === 'title' ? '📋 复制标题' : '🔗 复制钩子'; }, 1500);
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = type === 'title' ? '📋 复制标题' : '📋 复制钩子'; }, 1500);
   }).catch(() => showToast('复制失败'));
 }
 
@@ -5265,13 +5870,13 @@ function wjRenderMusicList(catId) {
   container.innerHTML = tracks.map(t => {
     const isPlaying = wjCurrentTrack === t.id;
     const isPaused = isPlaying && document.getElementById('wjAudioPlayer') && document.getElementById('wjAudioPlayer').paused;
-    let btnLabel = isPlaying && !isPaused ? '⏸ 播放中' : '▶ 播放';
+    let btnLabel = isPlaying && !isPaused ? '▶ 播放中' : '▶ 播放';
     let itemStyle = isPlaying && !isPaused ? 'background:color-mix(in srgb, var(--accent) 10%, var(--bg));border-color:var(--accent);' : '';
     return '<div class="wj-music-item" style="'+itemStyle+'">'
-    +'<span class="wj-music-name">'+escapeHtml(t.name)+(isPlaying?' 🎵':'')+'</span>'
+    +'<span class="wj-music-name">'+escapeHtml(t.name)+(isPlaying?' 🔊':'')+'</span>'
     +'<span class="wj-music-src">'+(t.isLocal?'本地文件':'在线链接')+'</span>'
     +'<button class="wj-music-play" onclick="wjPlayTrack(\''+t.id+'\')">'+btnLabel+'</button>'
-    +'<button class="wj-music-del" onclick="wjDeleteTrack(\''+t.id+'\')">✕</button>'
+    +'<button class="wj-music-del" onclick="wjDeleteTrack(\''+t.id+'\')">🗑️</button>'
     +'</div>';
   }).join('');
 }
@@ -5583,11 +6188,273 @@ function confirmIndustry() {
   setIndustry(_pendingIndustry);
   localStorage.setItem('wjIndustrySetupDone', '1');
   document.getElementById('industryGuideModal').style.display = 'none';
-  showToast('已设定行业：'+_pendingIndustry);
+  showIndustryTrainModal();
 }
 function skipIndustrySetup() {
   localStorage.setItem('wjIndustrySetupDone', '1');
   document.getElementById('industryGuideModal').style.display = 'none';
+}
+
+// 显示行业训练引导弹窗
+function showIndustryTrainModal() {
+  const modal = document.getElementById('industryTrainModal');
+  if (!modal) return;
+  document.getElementById('trainIndustryName').textContent = getIndustry();
+  modal.style.display = 'flex';
+}
+// 跳过训练
+function skipIndustryTrain() {
+  document.getElementById('industryTrainModal').style.display = 'none';
+  showToast('可随时在侧边栏「行业训练」中开始训练');
+}
+// ===== IP 训练问答系统核心逻辑 =====
+let _trainCurCat = 0;
+let _trainCurIdx = 0;
+let _trainAnswers = {};
+
+// 打开训练问答弹窗
+function openIpTrainModal() {
+  _trainAnswers = loadTrainAnswers();
+  const prog = loadTrainProgress();
+  _trainCurCat = prog.cat || 0;
+  _trainCurIdx = prog.idx || 0;
+  
+  const modal = document.getElementById('ipTrainModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  renderTrainCats();
+  renderTrainPage();
+  updateTrainProgressUI();
+}
+
+// 关闭训练弹窗（保存进度）
+function closeIpTrain() {
+  saveTrainAnswers(_trainAnswers);
+  saveTrainProgress({cat:_trainCurCat, idx:_trainCurIdx});
+  document.getElementById('ipTrainModal').style.display = 'none';
+  showToast('进度已保存，下次继续');
+}
+
+// 渲染分类导航
+function renderTrainCats() {
+  const el = document.getElementById('ipTrainCats');
+  if (!el) return;
+  el.innerHTML = IP_TRAIN_CATEGORIES.map((cat, i) => {
+    let cls = 'ip-train-cat';
+    if (i === _trainCurCat) cls += ' active';
+    else if (i < _trainCurCat) cls += ' done';
+    return '<span class="'+cls+'" onclick="jumpTrainCat('+i+')">'+cat.icon+' '+cat.name+'</span>';
+  }).join('');
+}
+
+// 跳转到指定分类
+function jumpTrainCat(catIdx) {
+  _trainCurCat = catIdx;
+  _trainCurIdx = 0;
+  renderTrainCats();
+  renderTrainPage();
+  updateTrainProgressUI();
+}
+
+// 获取当前分类的问题列表
+function getCatQuestions(catIdx) {
+  return IP_TRAIN_QUESTIONS.filter(q => q.c === catIdx);
+}
+
+// 渲染当前页（3题）
+function renderTrainPage() {
+  const el = document.getElementById('ipTrainQuestions');
+  if (!el) return;
+  const cat = IP_TRAIN_CATEGORIES[_trainCurCat];
+  document.getElementById('trainCatTitle').textContent = cat.icon + ' ' + cat.name;
+  document.getElementById('trainCatDesc').textContent = cat.desc;
+  
+  const questions = getCatQuestions(_trainCurCat);
+  const totalInCat = questions.length;
+  const page = questions.slice(_trainCurIdx, _trainCurIdx + 3);
+  
+  if (page.length === 0) {
+    // 当前分类已完成，跳到下一个分类
+    if (_trainCurCat < 5) {
+      _trainCurCat++;
+      _trainCurIdx = 0;
+      renderTrainCats();
+      renderTrainPage();
+      updateTrainProgressUI();
+      return;
+    } else {
+      // 全部完成
+      el.innerHTML = '<div style="text-align:center;padding:40px 0"><h3 style="color:var(--accent)">&#x1F389; 全部完成！</h3><p style="color:var(--text-muted);margin:8px 0">你的IP训练数据已保存，AI现在更懂你了</p></div>';
+      document.getElementById('btnIpTrainNext').textContent = '完成训练';
+      document.getElementById('btnIpTrainNext').onclick = finishIpTrain;
+      return;
+    }
+  }
+  
+  document.getElementById('btnIpTrainNext').textContent = (_trainCurIdx + 3 >= totalInCat) ? '完成此分类 →' : '保存并继续 →';
+  document.getElementById('btnIpTrainNext').onclick = nextIpTrainPage;
+  
+  // 全局题号映射
+  const globalIdx = IP_TRAIN_QUESTIONS.findIndex(q => q.c === _trainCurCat) + _trainCurIdx;
+  
+  el.innerHTML = page.map((q, i) => {
+    const qid = 'q_' + _trainCurCat + '_' + (_trainCurIdx + i);
+    const savedVal = _trainAnswers[qid] || '';
+    const qNum = globalIdx + i + 1;
+    let inputHtml = '';
+    if (q.t === 'quick' && q.opts) {
+      inputHtml = '<div class="ip-train-q-quick">' + q.opts.map(opt => {
+        const sel = savedVal === opt ? ' selected' : '';
+        return '<span class="ip-train-q-chip'+sel+'" data-qid="'+qid+'" data-val="'+escapeHtml(opt)+'" onclick="toggleChip(this)">'+escapeHtml(opt)+'</span>';
+      }).join('') + '</div>' +
+      '<input type="text" class="ip-train-q-input" style="margin-top:6px;min-height:36px" id="input_'+qid+'" placeholder="或输入其他…" value="'+escapeHtml(savedVal && !q.opts.includes(savedVal) ? savedVal : '')+'">';
+    } else {
+      inputHtml = '<textarea class="ip-train-q-input" id="input_'+qid+'" placeholder="输入你的回答…">'+escapeHtml(savedVal)+'</textarea>';
+    }
+    return '<div class="ip-train-q-card"><div class="ip-train-q-num">Q'+qNum+'</div><div class="ip-train-q-text">'+q.q+'</div>'+inputHtml+'</div>';
+  }).join('');
+}
+
+// chip 选择切换
+function toggleChip(chip) {
+  const qid = chip.dataset.qid;
+  const val = chip.dataset.val;
+  const parent = chip.parentElement;
+  const chips = parent.querySelectorAll('.ip-train-q-chip');
+  const isMulti = false; // 默认单选
+  const alreadySelected = chip.classList.contains('selected');
+  
+  if (!isMulti) {
+    chips.forEach(c => c.classList.remove('selected'));
+  }
+  if (!alreadySelected) {
+    chip.classList.add('selected');
+    _trainAnswers[qid] = val;
+  } else if (isMulti) {
+    chip.classList.remove('selected');
+    _trainAnswers[qid] = '';
+  } else {
+    chip.classList.remove('selected');
+    _trainAnswers[qid] = '';
+  }
+  // 清空文本输入如果选了chip
+  const textInput = document.getElementById('input_'+qid);
+  if (textInput && !alreadySelected) textInput.value = '';
+}
+
+// 收集当前页答案
+function collectPageAnswers() {
+  const questions = getCatQuestions(_trainCurCat);
+  const page = questions.slice(_trainCurIdx, _trainCurIdx + 3);
+  page.forEach((q, i) => {
+    const qid = 'q_' + _trainCurCat + '_' + (_trainCurIdx + i);
+    const chip = document.querySelector('.ip-train-q-chip.selected[data-qid="'+qid+'"]');
+    const textInput = document.getElementById('input_'+qid);
+    if (chip) {
+      _trainAnswers[qid] = chip.dataset.val;
+    } else if (textInput && textInput.value.trim()) {
+      _trainAnswers[qid] = textInput.value.trim();
+    }
+  });
+}
+
+// 下一页
+function nextIpTrainPage() {
+  collectPageAnswers();
+  const questions = getCatQuestions(_trainCurCat);
+  _trainCurIdx += 3;
+  if (_trainCurIdx >= questions.length) {
+    // 当前分类完成
+    _trainCurCat++;
+    _trainCurIdx = 0;
+    if (_trainCurCat >= 6) {
+      // 全部完成
+      saveTrainAnswers(_trainAnswers);
+      saveTrainProgress({cat:_trainCurCat, idx:0});
+      finishIpTrain();
+      return;
+    }
+  }
+  saveTrainAnswers(_trainAnswers);
+  saveTrainProgress({cat:_trainCurCat, idx:_trainCurIdx});
+  renderTrainCats();
+  renderTrainPage();
+  updateTrainProgressUI();
+  document.getElementById('ipTrainPanel')?.scrollTo(0, 0);
+}
+
+// 跳过当前页
+function skipIpTrainPage() {
+  const questions = getCatQuestions(_trainCurCat);
+  _trainCurIdx += 3;
+  if (_trainCurIdx >= questions.length) {
+    _trainCurCat++;
+    _trainCurIdx = 0;
+    if (_trainCurCat >= 6) { finishIpTrain(); return; }
+  }
+  saveTrainProgress({cat:_trainCurCat, idx:_trainCurIdx});
+  renderTrainCats();
+  renderTrainPage();
+  updateTrainProgressUI();
+}
+
+// 跳过整个分类
+function skipIpTrainCategory() {
+  _trainCurCat++;
+  _trainCurIdx = 0;
+  if (_trainCurCat >= 6) { finishIpTrain(); return; }
+  saveTrainProgress({cat:_trainCurCat, idx:0});
+  renderTrainCats();
+  renderTrainPage();
+  updateTrainProgressUI();
+}
+
+// 更新进度条
+function updateTrainProgressUI() {
+  const totalDone = IP_TRAIN_QUESTIONS.filter(q => q.c < _trainCurCat).length + _trainCurIdx;
+  const total = 100;
+  const pct = Math.round(totalDone / total * 100);
+  document.getElementById('ipTrainProgressFill').style.width = pct + '%';
+  document.getElementById('ipTrainProgressText').textContent = totalDone + ' / ' + total;
+}
+
+// 完成训练
+function finishIpTrain() {
+  localStorage.setItem('wjIndustryTrained', '1');
+  saveTrainAnswers(_trainAnswers);
+  saveTrainProgress({cat:6, idx:0});
+  document.getElementById('ipTrainModal').style.display = 'none';
+  showToast('&#x1F389; 训练完成！AI已深度了解你的IP');
+}
+
+// 修改 startIndustryTrain 为打开问答弹窗
+function startIndustryTrain() {
+  document.getElementById('industryTrainModal').style.display = 'none';
+  localStorage.setItem('wjIndustryTrained', '1');
+  openIpTrainModal();
+}
+// 检查当前行业是否已训练过
+function isIndustryTrained() {
+  return localStorage.getItem('wjIndustryTrained') === '1';
+}
+// 显示未训练警告
+function showUntrainedWarning() {
+  const modal = document.getElementById('untrainedWarnModal');
+  if (!modal) return;
+  document.getElementById('warnIndustryName').textContent = getIndustry();
+  modal.style.display = 'flex';
+}
+// 继续生成（跳过警告）
+function continueWithoutTrain() {
+  document.getElementById('untrainedWarnModal').style.display = 'none';
+  _untrainedContinue = true;
+  // 重新触发生成
+  if (_pendingGenerate) { _pendingGenerate(); _pendingGenerate = null; }
+}
+// 去行业训练（关闭生成警告，打开训练引导）
+function goToIndustryTrain() {
+  document.getElementById('untrainedWarnModal').style.display = 'none';
+  showIndustryTrainModal();
 }
 
 // 批量训练模式
@@ -5602,7 +6469,7 @@ function toggleTrainMode() {
     btn.style.background = 'var(--danger)';
   } else {
     bar.classList.remove('active');
-    btn.textContent = '🤖 训练 AI';
+    btn.textContent = '🧠 训练 AI';
     btn.style.background = 'var(--purple)';
   }
   updateTrainCount();
@@ -5983,7 +6850,7 @@ function hotRenderList() {
   const listEl = document.getElementById('hotList');
   if (!listEl) return;
   if (!hotCurrentList || hotCurrentList.length === 0) {
-    listEl.innerHTML = '<div class="hot-empty"><div style="font-size:2rem;margin-bottom:8px;">📡</div><p>暂无热点数据</p><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">请尝试切换上方其他平台查看</p></div>';
+    listEl.innerHTML = '<div class="hot-empty"><div style="font-size:2rem;margin-bottom:8px;">📭</div><p>暂无热点数据</p><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">请尝试切换上方其他平台查看</p></div>';
     return;
   }
   const selectedIds = new Set(hotContext.map(h => h.id));
@@ -6577,41 +7444,137 @@ function showIndustryGuideOnce() {
   }, 500);
 }
 
-init();
+// ===== Supabase Auth 登录拦截 =====
+
+// 页面初始化：检查 Supabase Auth 会话
+async function checkLoginState() {
+  if (!supabase) {
+    try { await supaInit(); } catch(e) {}
+  }
+  if (!supabase || !supabase.auth) {
+    document.getElementById('loginOverlay').classList.add('show');
+    document.getElementById('loginUsername').focus();
+    return;
+  }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      document.getElementById('appMain').classList.add('logged-in');
+      document.getElementById('loginOverlay').classList.remove('show');
+      init();
+    } else {
+      document.getElementById('appMain').classList.remove('logged-in');
+      document.getElementById('loginOverlay').classList.add('show');
+      document.getElementById('loginUsername').focus();
+    }
+  } catch(e) {
+    document.getElementById('loginOverlay').classList.add('show');
+    document.getElementById('loginUsername').focus();
+  }
+}
+
+// 退出登录
+async function handleLogout() {
+  try { await supabase.auth.signOut(); } catch(e) {}
+  document.getElementById('appMain').classList.remove('logged-in');
+  document.getElementById('loginOverlay').classList.add('show');
+  document.getElementById('loginUsername').focus();
+  showLoginToast('已退出登录', 'info');
+}
+
+// 密码可见切换
+document.getElementById('loginTogglePw').addEventListener('click', function() {
+  var pw = document.getElementById('loginPassword');
+  var isPassword = pw.type === 'password';
+  pw.type = isPassword ? 'text' : 'password';
+  this.querySelector('svg').innerHTML = isPassword
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="1" y1="1" x2="23" y2="23" stroke-width="2" stroke-linecap="round"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke-width="2"/>';
+});
+
+// Toast 提示
+function showLoginToast(msg, type) {
+  var existing = document.querySelector('.login-toast');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.className = 'login-toast ' + type;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3000);
+}
+
+// 忘记密码
+document.getElementById('loginForgotLink').addEventListener('click', function(e) {
+  e.preventDefault();
+  showLoginToast('请联系管理员重置密码', 'error');
+});
+
+// 表单提交 - Supabase Auth 登录
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var emailVal = document.getElementById('loginUsername').value.trim();
+  var passVal = document.getElementById('loginPassword').value.trim();
+  var btn = document.getElementById('btnLoginSubmit');
+
+  if (!emailVal) {
+    showLoginToast('请输入邮箱', 'error');
+    document.getElementById('loginUsername').focus();
+    return;
+  }
+  if (!passVal) {
+    showLoginToast('请输入密码', 'error');
+    document.getElementById('loginPassword').focus();
+    return;
+  }
+  if (passVal.length < 6) {
+    showLoginToast('密码长度不能少于 6 位', 'error');
+    document.getElementById('loginPassword').focus();
+    return;
+  }
+
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  supabase.auth.signInWithPassword({ email: emailVal, password: passVal })
+    .then(function(ret) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      if (ret.error) {
+        showLoginToast(ret.error.message, 'error');
+        return;
+      }
+      showLoginToast('登录成功', 'success');
+      if (document.getElementById('loginRememberMe').checked) {
+        try { localStorage.setItem('lindao_remember_user', emailVal); } catch(_) {}
+      } else {
+        try { localStorage.removeItem('lindao_remember_user'); } catch(_) {}
+      }
+      setTimeout(function() {
+        document.getElementById('loginOverlay').classList.remove('show');
+        document.getElementById('appMain').classList.add('logged-in');
+        init();
+      }, 500);
+    })
+    .catch(function(e) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      showLoginToast('登录失败，请稍后重试', 'error');
+    });
+});
+
+// 记住账号回填
+try {
+  var saved = localStorage.getItem('lindao_remember_user');
+  if (saved) {
+    document.getElementById('loginUsername').value = saved;
+    document.getElementById('loginRememberMe').checked = true;
+  }
+} catch(_) {}
+
+// 页面加载时检查登录状态
+checkLoginState();
 </script>
 
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
